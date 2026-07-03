@@ -1,0 +1,1 @@
+{ "name": "@tamedtable/core", "version": "0.1.0", "type": "module", "main": "index.ts", "dependencies": { "@tamedtable/table-plan": "workspace:*", "@tamedtable/file-io": "workspace:*" } }

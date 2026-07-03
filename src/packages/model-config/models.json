@@ -1,0 +1,8 @@
+[
+  { "id": "gemini-3.5-flash", "name": "Gemini 3.5 Flash", "desc": "Fast, voice-capable default", "provider": "gemini", "voiceInput": true, "temperature": true, "default": true },
+  { "id": "gemini-3.1-flash-lite", "name": "Gemini 3.1 Flash Lite", "desc": "Cheapest per-row cell model", "provider": "gemini", "voiceInput": true, "temperature": true, "secondaryDefault": true },
+  { "id": "claude-sonnet-4-6", "name": "Sonnet 4.6", "desc": "Anthropic default", "provider": "anthropic", "voiceInput": false, "temperature": true, "default": true },
+  { "id": "claude-haiku-4-5", "name": "Haiku 4.5", "desc": "Anthropic cell model", "provider": "anthropic", "voiceInput": false, "temperature": true, "secondaryDefault": true },
+  { "id": "gpt-5.5", "name": "GPT-5.5", "desc": "OpenAI default", "provider": "openai", "voiceInput": false, "temperature": false, "default": true },
+  { "id": "gpt-5.4-mini", "name": "GPT-5.4 mini", "desc": "OpenAI cell model", "provider": "openai", "voiceInput": false, "temperature": false, "secondaryDefault": true }
+]
