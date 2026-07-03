@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TamedTable</title>
+  <style>
+    :root { --ink: #281C60; --accent: #96BED7; --line: #DCDCDC; --ground: #F7F5F2; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; color: var(--ink); background: var(--ground); }
+    .toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #fff;
+               border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    .brand { font-weight: 700; letter-spacing: 0.5px; }
+    .file { color: #666; font-size: 13px; margin-right: 8px; }
+    .gap { flex: 1; }
+    button { cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink);
+             border-radius: 6px; padding: 5px 12px; font-size: 13px; }
+    button:hover { background: var(--ground); }
+    .split { position: relative; display: inline-flex; }
+    .split .caret { padding: 5px 6px; margin-left: -1px; }
+    .menu { display: none; position: absolute; top: 100%; left: 0; z-index: 10; background: #fff;
+            border: 1px solid var(--line); border-radius: 6px; min-width: 170px; box-shadow: 0 4px 14px rgba(40,28,96,.15); }
+    .menu button, .menu-item { display: block; width: 100%; border: 0; border-radius: 0; text-align: left; }
+    .main { display: flex; gap: 16px; padding: 16px; align-items: flex-start; }
+    .table-wrap { flex: 1; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; }
+    .empty { text-align: center; padding: 48px 16px; }
+    .empty .row { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+    .chat { width: 320px; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 12px;
+            display: flex; flex-direction: column; gap: 8px; }
+    .chat h3 { margin: 0; font-size: 14px; }
+    .messages { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
+    .bubble { padding: 6px 10px; border-radius: 10px; font-size: 13px; white-space: pre-wrap; }
+    .bubble.user { background: var(--accent); align-self: flex-end; }
+    .bubble.assistant { background: var(--ground); align-self: flex-start; }
+    .bubble.error { background: #f6d6d6; }
+    textarea { min-height: 56px; border: 1px solid var(--line); border-radius: 6px; padding: 6px; font: inherit; }
+    .dialog { position: fixed; top: 15%; left: 50%; transform: translateX(-50%); z-index: 20; background: #fff;
+              border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 340px; max-height: 70vh;
+              overflow-y: auto; box-shadow: 0 8px 30px rgba(40,28,96,.25); }
+    .dialog h3 { margin-top: 0; }
+    .dialog input[type=text], .dialog input[type=password] { width: 100%; padding: 6px; margin-bottom: 8px;
+              border: 1px solid var(--line); border-radius: 6px; }
+    .dialog .row { display: flex; gap: 8px; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+    .card-head { width: 100%; text-align: left; font-weight: 600; border: 0; }
+    .model, .tour { display: block; width: 100%; text-align: left; border: 0; }
+    .tour-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--ink); color: #fff; }
+    .tour-bar button { background: transparent; color: #fff; border-color: rgba(255,255,255,.4); }
+    .toasts { position: fixed; bottom: 16px; right: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 30; }
+    .toast { background: var(--ink); color: #fff; border-radius: 8px; padding: 10px 14px; max-width: 380px;
+             font-size: 13px; display: flex; gap: 8px; align-items: start; }
+    .toast .dismiss { background: transparent; color: #fff; border: 0; padding: 0 2px; }
+    table { border-collapse: collapse; }
+    th, td { font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
