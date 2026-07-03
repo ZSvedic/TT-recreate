@@ -306,3 +306,21 @@ Feature: Gherkin Tour parser
       And the driver finishes
       Then the adapter onFinish was called
       And the driver is not active
+
+  Rule: The demo page steps a tour in a real browser
+
+    @web
+    Scenario: The demo parses the embedded feature into a tour
+      Given the gherkin-tour demo page
+      Then the demo tour is named "Filter by Country"
+      And the demo tour has 2 steps
+
+    @web
+    Scenario: Advancing to the end dispatches every action and the golden
+      Given the gherkin-tour demo page
+      When the user plays the demo tour
+      And the user advances the demo tour 2 times
+      Then the demo adapter log shows "loadFile(filter-input.csv)"
+      And the demo adapter log shows "prefillChat(Show only customers in the USA)"
+      And the demo adapter log shows "showGolden(filter-expected.jsonl)"
+      And the demo tour state is "done"

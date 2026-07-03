@@ -2,7 +2,9 @@
   "name": "@tamedtable/web",
   "private": true,
   "type": "module",
-  "exports": { ".": "./index.ts" },
+  "exports": {
+    ".": "./index.ts"
+  },
   "dependencies": {
     "@tamedtable/cassette": "workspace:*",
     "@tamedtable/core": "workspace:*",
@@ -12,5 +14,8 @@
     "@tamedtable/model-config": "workspace:*",
     "@tamedtable/table-view": "workspace:*",
     "@tamedtable/voice-input": "workspace:*"
+  },
+  "scripts": {
+    "build": "bun build.ts"
   }
 }
