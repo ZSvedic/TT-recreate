@@ -1,9 +1,12 @@
 name: Deploy site to GitHub Pages
-# Publishes to the gh-pages branch (Pages source: "Deploy from a branch") as
-# project pages at https://zsvedic.github.io/TT-recreate/ — this recreation
-# repo has no custom domain. The branch source is shared with PR previews:
-# prod lives at the branch root, previews under pr-preview/pr-<N>/. keep_files
-# preserves those preview subdirs when prod redeploys.
+# Publishes project pages at https://zsvedic.github.io/TT-recreate/ — this
+# recreation repo has no custom domain. Uses the Actions-native Pages flow
+# (configure-pages → upload-pages-artifact → deploy-pages): the workflow token
+# can self-enable a *workflow-sourced* Pages site with `pages: write`, while
+# creating a branch-sourced site needs repo-admin the token does not have.
+# (The original repo publishes a gh-pages branch shared with PR previews;
+# pr-preview.yml needs rework before previews return — see
+# temp/recreate-status.md.)
 on:
   push:
     branches: [main]
@@ -16,14 +19,18 @@ on:
       - '.github/scripts/build-site.sh'
   workflow_dispatch:  # manual rebuild from the Actions tab
 permissions:
-  contents: write
+  contents: read
   pages: write
+  id-token: write
 concurrency:
   group: pages-deploy
   cancel-in-progress: false
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
@@ -47,23 +54,12 @@ jobs:
           # Project pages: served under the repo prefix, not a domain root.
           SITE_BASE: /TT-recreate/
           OUT_DIR: _site
-      - uses: peaceiris/actions-gh-pages@v4
+      # enablement: true creates the Pages site on first run (idempotent).
+      - uses: actions/configure-pages@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./_site
-          publish_branch: gh-pages
-          keep_files: true  # don't wipe pr-preview/ subdirs
-      # First deploy on a fresh repo: create the Pages site pointing at the
-      # gh-pages branch just pushed above. Idempotent — 409 means it already
-      # exists. (Runs here because agent sandboxes cannot reach the Pages API.)
-      - name: Ensure Pages is enabled (source gh-pages branch)
-        run: |
-          code=$(curl -s -o /tmp/pages.json -w '%{http_code}' \
-            -X POST \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/pages" \
-            -d '{"source":{"branch":"gh-pages","path":"/"}}')
-          cat /tmp/pages.json
-          echo "pages create: HTTP $code"
-          [ "$code" = "201" ] || [ "$code" = "409" ] || exit 1
+          enablement: true
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./_site
+      - uses: actions/deploy-pages@v4
+        id: deployment
