@@ -1,6 +1,7 @@
 // Cucumber runner — one profile per invocation: headless | cli | web.
 // Runs the app features in spec/test-cases/ plus every package feature,
 // filtered by the profile tag. TAMEDTABLE_FEATURES=a,b narrows the file set.
+import { join } from 'node:path';
 import { loadConfiguration, loadSupport, runCucumber } from '@cucumber/cucumber/api';
 
 const profile = process.argv[2];
@@ -19,7 +20,7 @@ const paths = only
 const { runConfiguration } = await loadConfiguration({
   provided: {
     paths,
-    support: { requireModules: [], requirePaths: [], importPaths: ['tests/steps.ts'] },
+    import: [join(import.meta.dir, 'steps.ts')],
     tags: `@${profile} and not @perf and not @needs-recording`,
     format: ['progress'],
     parallel: 0,

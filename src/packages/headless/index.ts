@@ -354,6 +354,7 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions = {}): Runner &
         elapsedMs: Date.now() - t0,
       });
 
+      let deferRelease = false;
       try {
         let lastError: string | undefined;
         for (let turn = 0; turn < recoveryBudget; turn++) {
@@ -401,7 +402,36 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions = {}): Runner &
           if (orderError) { rejected(orderError); continue; }
 
           try {
-            const newRows = await runSpec(newSpec, { ...requestOpts, onChunk: (u) => { sampleChunk(u); requestOpts.onChunk?.(u); } });
+            // #CancelOp — a cancel signals within a 2-second budget even when
+            // the underlying work (a SQL query ignoring interrupt) drains
+            // later; `running` stays true until it does.
+            const evalPromise = runSpec(newSpec, { ...requestOpts, onChunk: (u) => { sampleChunk(u); requestOpts.onChunk?.(u); } });
+            let newRows: Row[];
+            if (requestOpts.signal) {
+              const signal = requestOpts.signal;
+              let timer: ReturnType<typeof setTimeout> | undefined;
+              try {
+                newRows = await Promise.race([
+                  evalPromise,
+                  new Promise<never>((_, rej) => {
+                    const arm = () => { timer = setTimeout(() => rej(new Error('cancelled')), 2000); };
+                    if (signal.aborted) arm();
+                    else signal.addEventListener('abort', arm, { once: true });
+                  }),
+                ]);
+              } catch (raceErr) {
+                if ((raceErr as Error).message === 'cancelled') {
+                  let settled = false;
+                  evalPromise.catch(() => { /* drained */ }).finally(() => { settled = true; running = false; });
+                  if (!settled) deferRelease = true;
+                }
+                throw raceErr;
+              } finally {
+                clearTimeout(timer);
+              }
+            } else {
+              newRows = await evalPromise;
+            }
             turns.push({ ops: decoded, outcome: 'committed' });
             const expressions = newSpec.transformations
               .slice(spec.transformations.length)
@@ -431,7 +461,7 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions = {}): Runner &
         }
         throw e;
       } finally {
-        running = false;
+        if (!deferRelease) running = false;
       }
     },
 

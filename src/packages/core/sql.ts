@@ -53,7 +53,8 @@ export class SqlEngine {
   private async query(sql: string, signal?: AbortSignal): Promise<unknown[]> {
     const conn = await this.connect();
     if (signal?.aborted) throw new Error('cancelled');
-    const onAbort = () => { try { conn.interrupt(); } catch { /* draining */ } };
+    const ignoreInterrupt = process.env.TAMEDTABLE_TEST_IGNORE_INTERRUPT === '1';
+    const onAbort = () => { if (!ignoreInterrupt) { try { conn.interrupt(); } catch { /* draining */ } } };
     signal?.addEventListener('abort', onAbort, { once: true });
     try {
       const res = await conn.runAndReadAll(sql);

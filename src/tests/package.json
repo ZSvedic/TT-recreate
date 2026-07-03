@@ -1,0 +1,19 @@
+{
+  "name": "@tamedtable/tests",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@tamedtable/table-plan": "workspace:*",
+    "@tamedtable/file-io": "workspace:*",
+    "@tamedtable/core": "workspace:*",
+    "@tamedtable/headless": "workspace:*",
+    "@tamedtable/cli": "workspace:*",
+    "@tamedtable/model-config": "workspace:*",
+    "@tamedtable/cassette": "workspace:*",
+    "@tamedtable/gherkin-tour": "workspace:*",
+    "@tamedtable/voice-input": "workspace:*",
+    "@tamedtable/table-view": "workspace:*",
+    "@tamedtable/toolbar": "workspace:*",
+    "@tamedtable/ui-kit": "workspace:*"
+  }
+}

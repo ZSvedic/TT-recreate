@@ -78,6 +78,23 @@
       "name": "@tamedtable/voice-input",
       "version": "0.1.0",
     },
+    "tests": {
+      "name": "@tamedtable/tests",
+      "dependencies": {
+        "@tamedtable/cassette": "workspace:*",
+        "@tamedtable/cli": "workspace:*",
+        "@tamedtable/core": "workspace:*",
+        "@tamedtable/file-io": "workspace:*",
+        "@tamedtable/gherkin-tour": "workspace:*",
+        "@tamedtable/headless": "workspace:*",
+        "@tamedtable/model-config": "workspace:*",
+        "@tamedtable/table-plan": "workspace:*",
+        "@tamedtable/table-view": "workspace:*",
+        "@tamedtable/toolbar": "workspace:*",
+        "@tamedtable/ui-kit": "workspace:*",
+        "@tamedtable/voice-input": "workspace:*",
+      },
+    },
   },
   "packages": {
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
@@ -145,6 +162,8 @@
     "@tamedtable/table-plan": ["@tamedtable/table-plan@workspace:packages/table-plan"],
 
     "@tamedtable/table-view": ["@tamedtable/table-view@workspace:packages/table-view"],
+
+    "@tamedtable/tests": ["@tamedtable/tests@workspace:tests"],
 
     "@tamedtable/toolbar": ["@tamedtable/toolbar@workspace:packages/toolbar"],
 
