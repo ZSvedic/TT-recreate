@@ -5,7 +5,10 @@ import { setWorldConstructor, setDefaultTimeout, Before, After, World as Cucumbe
 import type { Row, ChunkUpdate } from '@tamedtable/core';
 import { createHeadlessRunner, type HeadlessRunnerOptions, type Runner } from '@tamedtable/headless';
 import { CliSession } from '@tamedtable/cli';
+import { WebController, type TutorialManifestEntry } from '@tamedtable/web';
+import { parseTours } from '@tamedtable/gherkin-tour';
 import { makeRecorder } from './cassette.ts';
+import { readdirSync, writeFileSync } from 'node:fs';
 
 setDefaultTimeout(60_000);
 
@@ -28,10 +31,28 @@ export function readJsonlFile(path: string): Row[] {
   return readFileSync(path, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
 }
 
+// The tutorial manifest — every scenario name/feature/tags pair, frozen once.
+let manifestCache: TutorialManifestEntry[] | null = null;
+export function tutorialManifest(): TutorialManifestEntry[] {
+  if (!manifestCache) {
+    manifestCache = [];
+    for (const file of readdirSync(FIXTURES).filter((f) => f.endsWith('.feature')).sort()) {
+      for (const s of parseTours(readFileSync(join(FIXTURES, file), 'utf8'))) {
+        manifestCache.push({ name: s.name, feature: file, tags: s.tags });
+      }
+    }
+  }
+  return manifestCache;
+}
+
 export class TTWorld extends CucumberWorld {
   profile = process.env.TAMEDTABLE_PROFILE ?? 'headless';
   featureName = '';
   recorder: ReturnType<typeof makeRecorder> | null = null;
+  controller: WebController | null = null;
+  fsAccess = true;
+  urlRoutes = new Map<string, string>();
+  replayRecorders: Array<ReturnType<typeof makeRecorder>> = [];
   runner: (Runner & { exportPython(): Promise<string> }) | null = null;
   session: CliSession | null = null;
   replOut: string[] = [];
@@ -57,15 +78,70 @@ export class TTWorld extends CucumberWorld {
   runnerOpts(): HeadlessRunnerOptions {
     const opts: HeadlessRunnerOptions = {
       apiKey: 'placeholder',
-      fetch: this.recorder ?? undefined,
+      fetch: this.recorder ? this.routedFetch() : undefined,
       cwd: SRC_DIR,
       ...this.extraRunnerOpts,
     };
     return opts;
   }
 
+  /** The recorder, with test URL routes served from fixture files first. */
+  routedFetch(): NonNullable<HeadlessRunnerOptions['fetch']> {
+    return async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const served = this.urlRoutes.get(url);
+      if (served) {
+        const type = served.endsWith('.csv') ? 'text/csv' : served.endsWith('.jsonl') ? 'application/jsonl' : 'application/octet-stream';
+        return new Response(readFileSync(served), { status: 200, headers: { 'content-type': type } });
+      }
+      return this.recorder!(input, init);
+    };
+  }
+
+  ensureController(): WebController {
+    if (!this.controller) {
+      const webSaves = join(TEMP, 'web-saves');
+      mkdirSync(webSaves, { recursive: true });
+      this.controller = new WebController({
+        engineOptions: () => this.runnerOpts(),
+        saveDir: webSaves,
+        writeFile: (p, d) => writeFileSync(p, d),
+        resolveFixturePath: (n) => fixturePath(n),
+        fsAccess: this.fsAccess,
+        // Replay needs no real key; a default one is present so only scenarios
+        // that explicitly clear it ("the API key has not been set") hit guards.
+        env: { GEMINI_API_KEY: 'placeholder-key' },
+        tutorialSources: {
+          manifest: tutorialManifest(),
+          loadFeature: async (name) => readFileSync(join(FIXTURES, name), 'utf8'),
+          loadFixture: async (name) => readFileSync(fixturePath(name), 'utf8'),
+          loadAudio: async (name) => new Uint8Array(readFileSync(fixturePath(name))),
+        },
+        replayFetchFor: (feature) => {
+          const r = makeRecorder(join(CASSETTES, `${feature}.json`), { mode: 'replay', contentMatch: true });
+          this.replayRecorders.push(r);
+          return r;
+        },
+        onAudioClip: (name) => this.setVoiceHint(name),
+      });
+    }
+    return this.controller;
+  }
+
+  setVoiceHint(name: string): void {
+    if (this.recorder) this.recorder.voiceHint = name;
+    for (const r of this.replayRecorders) r.voiceHint = name;
+  }
+
+  async resetEngine(): Promise<void> {
+    this.runner = null;
+    if (this.profile === 'web' && this.controller) await this.controller.rebuildEngine(false);
+  }
+
   ensureRunner(): Runner & { exportPython(): Promise<string> } {
-    if (!this.runner) this.runner = createHeadlessRunner(this.runnerOpts());
+    if (this.runner) return this.runner;
+    if (this.profile === 'web') return this.ensureController().engine();
+    this.runner = createHeadlessRunner(this.runnerOpts());
     return this.runner;
   }
 

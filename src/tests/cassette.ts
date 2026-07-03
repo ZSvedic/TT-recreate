@@ -114,6 +114,22 @@ const KIND_HINTS: Array<[RegExp, string]> = [
   [/\bgroup\b|\bcount\b|\baggregate\b/i, 'group'],
 ];
 
+/** Positive-evidence count: shared tokens/hints only, no agreement bonuses.
+ *  Zero evidence against every candidate means the request was never recorded. */
+function patchEvidence(userText: string, opsText: string): number {
+  let ev = 0;
+  for (const [re, keyword] of TRANSLATIONS) if (re.test(userText) && opsText.includes(keyword)) ev++;
+  for (const [re, kind] of KIND_HINTS) {
+    if (re.test(userText) && new RegExp(`(?<![a-z0-9])${kind}`).test(opsText)) ev++;
+  }
+  for (const w of new Set(words(userText))) {
+    const stem = w.replace(/s$/, '');
+    const re = new RegExp(`(?<![a-z0-9])${stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+    if (re.test(opsText)) ev++;
+  }
+  return ev;
+}
+
 function scorePatch(userText: string, opsText: string): number {
   let score = 0;
   for (const [re, keyword] of TRANSLATIONS) {
@@ -141,12 +157,76 @@ function scorePatch(userText: string, opsText: string): number {
   return score;
 }
 
+const LANGS = new Set(['english', 'spanish', 'french', 'german', 'japanese', 'italian', 'croatian', 'chinese',
+  'portuguese', 'dutch', 'korean', 'russian', 'arabic', 'hindi']);
+const CITY_COUNTRY: Record<string, string> = {
+  osaka: 'japan', tokyo: 'japan', paris: 'france', lyon: 'france', marseille: 'france',
+  berlin: 'germany', munich: 'germany', london: 'united kingdom', milan: 'italy', rome: 'italy',
+  toronto: 'canada', madrid: 'spain', chicago: 'united states',
+};
+const FAMOUS_DOMAINS = new Set(['microsoft', 'google', 'apple', 'amazon', 'tesla', 'meta', 'openai']);
+
+/** For a yes/no judgment task, a best-effort local guess used only to pick
+ *  among same-shaped recorded arrays (see temp/decisions.md). */
+function yesNoOracle(p: string): 'yes' | 'no' | null {
+  if (/email address look fake/.test(p)) {
+    // The row's email follows "Email: '…'" — the instruction itself quotes an
+    // unrelated example address.
+    const m = p.match(/email: '([a-z0-9._%+-]+)@([a-z0-9-]+)\.[a-z.]{2,}'/);
+    if (!m) return null;
+    const local = m[1]!.replace(/[^a-z]/g, ''), domain = m[2]!;
+    return local === domain || FAMOUS_DOMAINS.has(domain) ? 'yes' : 'no';
+  }
+  const city = p.match(/is the city '([^']+)' located in the country '([^']+)'/);
+  if (city) {
+    const known = CITY_COUNTRY[city[1]!.toLowerCase()];
+    return known ? (city[2]!.toLowerCase().includes(known) || known.includes(city[2]!.toLowerCase()) ? 'yes' : 'no') : null;
+  }
+  const price = p.match(/is (\d+(?:\.\d+)?) a plausible retail price/);
+  if (price) return Number(price[1]) < 5 ? 'no' : 'yes';
+  return null;
+}
+
+const HOUSE_NUMBER = /^\d+[a-z]?\s+[a-z]/;
+
+/** Instruction-keyed shape hints — the task text carries the recorded template,
+ *  so its distinctive phrasing disambiguates same-length recorded arrays. */
+function instructionHints(p: string, out: unknown, o: string): number {
+  let s = 0;
+  const isNum = /^\d+(\.\d+)?$/.test(o);
+  if (/extract the street address/.test(p)) s += HOUSE_NUMBER.test(o) ? 0.8 : -1.5;
+  if (/extract the city name/.test(p)) s += o !== '' && !/\d/.test(o) ? 0.7 : -1.5;
+  if (/extract the state or province/.test(p)) s += out === null || /^[a-z]{2}$/.test(o) ? 0.8 : -1.5;
+  if (/extract the postal code|extract the zip/.test(p)) {
+    s += /\d/.test(o) && o.length <= 8 && !HOUSE_NUMBER.test(o) ? 0.8 : -1.5;
+  }
+  if (/scale from 1[\s\S]{0,60}?to 5(?![0-9])/.test(p) && isNum) s += Number(o) <= 5 ? 0.5 : -1.5;
+  if (/to 100/.test(p) && isNum) s += Number(o) > 5 ? 0.5 : -0.4;
+  if (/language of this comment/.test(p)) s += LANGS.has(o) ? 0.8 : -0.8;
+  if (/translate this comment/.test(p)) {
+    s += LANGS.has(o) ? -1.2 : 0.3;
+    // A translation shares word stems with its source (produit→product,
+    // recommande→recommend); a summary of some other table shares none.
+    const input = p.match(/input: '([^']+)'/)?.[1] ?? '';
+    let stems = 0;
+    for (const w of input.match(/[a-zà-ÿ]{5,}/g) ?? []) if (o.includes(w.slice(0, 5))) stems++;
+    s += Math.min(0.8, stems * 0.4);
+  }
+  if (o === 'yes' || o === 'no') {
+    const g = yesNoOracle(p);
+    if (g) s += g === o ? 0.8 : -0.8;
+  }
+  return s;
+}
+
 /** Affinity between one rendered cell prompt and one recorded output value. */
 function affinity(prompt: string, out: unknown): number {
-  if (out === null) return 0.15;
-  const o = String(out).toLowerCase().trim();
   const p = prompt.toLowerCase();
-  let score = 0;
+  if (out === null) {
+    return /extract the state or province|extract the postal code|extract the zip/.test(p) ? 0.6 : 0.15;
+  }
+  const o = String(out).toLowerCase().trim();
+  let score = instructionHints(p, out, o);
   if (o.length > 1 && p.includes(o)) score += 1;
   // digit-run containment (phones, dates, amounts)
   const digits = (s: string) => s.match(/\d{2,}/g) ?? [];
@@ -176,7 +256,7 @@ export interface RecorderOptions {
   realFetch?: FetchLike;
 }
 
-export function makeRecorder(cassettePath: string, opts: RecorderOptions): FetchLike & { upstreamCalls: number } {
+export function makeRecorder(cassettePath: string, opts: RecorderOptions): FetchLike & { upstreamCalls: number; voiceHint: string } {
   let tape: Tape = existsSync(cassettePath) ? JSON.parse(readFileSync(cassettePath, 'utf8')) : {};
   let candidates: Candidate[] | null = null;
   const used = new Set<string>();
@@ -222,6 +302,11 @@ export function makeRecorder(cassettePath: string, opts: RecorderOptions): Fetch
     const req = parseRequest(bodyStr);
     if (!req) return null;
     if (req.kind === 'patch') {
+      // A voice patch turn carries no distinguishing user text (the audio does
+      // the talking) — the world sets the clip name as a matching hint.
+      if (recorder.voiceHint && bodyStr.includes('"inlineData"')) {
+        req.userText = recorder.voiceHint.replace(/[-.]/g, ' ').replace(/\bm4a\b/, '');
+      }
       // A recovery turn must not re-serve the patch that just failed for this
       // same request — that is how the recorded correction gets its turn.
       const served = servedByUser.get(req.userText) ?? new Set<string>();
@@ -230,6 +315,10 @@ export function makeRecorder(cassettePath: string, opts: RecorderOptions): Fetch
       // the patch that just failed, but a clear winner (e.g. the threshold
       // validate the scenario is about) keeps getting served.
       const c = pick(pool, (c) => scorePatch(req.userText, c.opsText!) - (req.recovery && served.has(c.key) ? 1.5 : 0));
+      // A request with no content overlap against any candidate is a genuine
+      // miss (e.g. a never-recorded tutorial request) — matching it would hide
+      // real bugs.
+      if (c && pool.every((cand) => patchEvidence(req.userText, cand.opsText!) === 0)) return null;
       if (c) {
         used.add(c.key);
         served.add(c.key);
@@ -294,7 +383,8 @@ export function makeRecorder(cassettePath: string, opts: RecorderOptions): Fetch
       flush();
     }
     return res;
-  }) as FetchLike & { upstreamCalls: number };
+  }) as FetchLike & { upstreamCalls: number; voiceHint: string };
   recorder.upstreamCalls = 0;
+  recorder.voiceHint = '';
   return recorder;
 }
