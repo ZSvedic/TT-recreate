@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mockups",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd temp/mockups && exec bunx serve -p 5174 ."],
+      "port": 5174
+    },
+    {
+      "name": "illustrations",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd marketing/illustrations && exec bunx serve -p 5180 ."],
+      "port": 5180
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd src/packages/web && exec bun run dev"],
+      "port": 5173
+    },
+    {
+      "name": "gherkin-tour-demo",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd src/packages/gherkin-tour && exec bun demo.html --port 3000"],
+      "port": 3000
+    }
+  ]
+}

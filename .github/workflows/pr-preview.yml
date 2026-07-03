@@ -1,0 +1,50 @@
+name: Deploy PR preview
+# Opt-in live preview at
+#   https://www.tamedtable.com/pr-preview/pr-<N>/
+# Add the `pr-preview` label to a PR to build it; pushes then keep it fresh while
+# the label is on. Torn down when the PR closes. Shares the gh-pages branch with
+# prod (deploy.yml): prod at the root, previews under pr-preview/.
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened, closed]
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: preview-${{ github.event.number }}
+  cancel-in-progress: true
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    # Build only for `pr-preview`-labelled PRs; always run on close so the teardown
+    # still removes a preview dir even after the label is gone.
+    if: >-
+      github.event.action == 'closed' ||
+      contains(github.event.pull_request.labels.*.name, 'pr-preview')
+    steps:
+      - uses: actions/checkout@v5
+      # Build only when deploying. On close, pr-preview-action just removes the
+      # preview dir, so the build steps are skipped.
+      - uses: oven-sh/setup-bun@v2
+        if: github.event.action != 'closed'
+      - run: bun install
+        working-directory: src
+        if: github.event.action != 'closed'
+      # Bake the per-PR prefix so the preview's asset links resolve at its URL.
+      - name: Build site for preview
+        if: github.event.action != 'closed'
+        run: .github/scripts/build-site.sh
+        env:
+          # Custom domain root: previews live at /pr-preview/pr-<N>/ (no
+          # /TamedTable/ prefix). Matches deploy.yml's root base.
+          SITE_BASE: /pr-preview/pr-${{ github.event.number }}/
+          OUT_DIR: _site
+      - uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: ./_site
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview
+          # The action's `auto` mode ignores the `labeled` event, so adding the
+          # label alone never deploys. Force a deploy on `labeled`; leave every
+          # other event (synchronize / closed / …) to `auto`.
+          action: ${{ github.event.action == 'labeled' && 'deploy' || 'auto' }}

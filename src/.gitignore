@@ -1,0 +1,14 @@
+node_modules/
+dist/
+temp/*
+!temp/.gitkeep
+*-output.*
+.DS_Store
+.env
+.env.local
+.claude/settings.local.json
+.claude/cache/
+.claude/worktrees/
+src/packages/web/test-results/
+src/packages/web/playwright-report/
+marketing/video/out/

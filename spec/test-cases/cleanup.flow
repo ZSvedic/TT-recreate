@@ -1,0 +1,38 @@
+{
+  "version": 2,
+  "source": "customers-input.csv",
+  "spec": {
+    "table": "customers-input.csv",
+    "columns": [
+      { "id": "ID" },
+      { "id": "FirstName" },
+      { "id": "LastName" },
+      { "id": "DOB" },
+      { "id": "Country" },
+      { "id": "Phone" }
+    ],
+    "transformations": [
+      {
+        "kind": "mutate",
+        "columns": "Phone",
+        "value": {
+          "llm": "Convert this phone number to E.164 format (a + followed by the country code and the national number, with no spaces, dashes, parentheses, or dots). Input phone: '{Phone}'. Customer country: '{Country}'. If the input starts with + or with a 0/00 international-dialing prefix in front of a country code, that leading part is the country code — drop any 0/00 and keep it. If the input has no international prefix at all, infer the country code from the customer country and prepend it. Use exactly the digits present in the input as the national number — never drop, pad, or invent digits. Reply with ONLY the resulting E.164 string (e.g. +12005551234) and nothing else. If the input is empty, 'NA', '-', or is just a short local number with no area code (so it cannot form a complete E.164 number), reply with the literal word: null"
+        }
+      },
+      {
+        "kind": "mutate",
+        "columns": "Country",
+        "value": {
+          "llm": "Normalize this country name to its standard English form. Input: '{Country}'. Reply with only the canonical English country name and nothing else. Examples: 'USA' -> 'United States', 'UK' or 'England' -> 'United Kingdom', 'The Bahamas' or 'Bahamas' -> 'Bahamas', 'Deutschland' -> 'Germany'."
+        }
+      },
+      {
+        "kind": "mutate",
+        "columns": "DOB",
+        "value": {
+          "llm": "Convert this date of birth to ISO format YYYY-MM-DD. Input: '{DOB}'. Reply with only the ISO date and nothing else. If the value is empty, 'NA', '-', or otherwise indicates missing data, reply with the literal word: null"
+        }
+      }
+    ]
+  }
+}

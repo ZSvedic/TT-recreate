@@ -1,0 +1,47 @@
+name: Link check
+
+# Lychee no longer gates PRs — link rot is caught during the
+# periodic project cleanup pass (see process/prompts/prompt-cleanup.md).
+# This workflow stays as a manual + scheduled safety net.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.md'
+      - .github/workflows/link-check.yml
+  schedule:
+    - cron: '0 9 * * 1'  # weekly Monday 09:00 UTC — catches external link rot
+
+jobs:
+  lychee:
+    runs-on: ubuntu-latest
+    # actions/cache has no Node 24 release yet; force it (and any other
+    # bundled Node 20 action) onto Node 24 to clear the deprecation warning.
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Restore lychee cache
+        uses: actions/cache@v4
+        with:
+          path: .lycheecache
+          key: lychee-${{ github.sha }}
+          restore-keys: lychee-
+
+      - name: Run lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --cache
+            --max-cache-age 1w
+            --no-progress
+            --accept '200..=204,403'
+            --exclude-path node_modules
+            --exclude-path src/node_modules
+            --exclude-path src/packages/web/node_modules
+            --exclude-path process/journal
+            './**/*.md'
+          fail: true

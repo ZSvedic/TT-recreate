@@ -1,0 +1,72 @@
+name: Deploy site to GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths:
+      # Rebuild when the web bundle, the marketing homepage, or its shared
+      # assets change. Doc-only / process-only commits should not redeploy.
+      - 'src/packages/web/**'
+      - 'src/packages/core/**'
+      - 'src/packages/headless/**'
+      - 'src/packages/model-config/**'
+      - 'src/packages/gherkin-tour/**'
+      - 'src/package.json'
+      - 'src/bun.lock'
+      - 'marketing/web/**'
+      - 'marketing/illustrations/**'
+      - 'marketing/brand/**'
+      - '.github/workflows/deploy.yml'
+      - '.github/scripts/build-site.sh'
+  workflow_dispatch:  # manual rebuild from the Actions tab
+# Publishes to the gh-pages branch (Pages source: "Deploy from a branch"). The
+# branch source is shared with PR previews (pr-preview.yml): prod lives at the
+# branch root, previews under pr-preview/pr-<N>/. keep_files preserves those
+# preview subdirs when prod redeploys.
+permissions:
+  contents: write
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      # Same cache as ci.yml (bun store + Playwright Chromium, keyed on
+      # bun.lock), so a deploy reuses the browser a CI run already downloaded —
+      # the fresh ~150MB download made the smoke gate slow and flaky.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.cache/ms-playwright
+          key: deps-${{ runner.os }}-${{ hashFiles('src/bun.lock') }}
+          restore-keys: deps-${{ runner.os }}-
+      - run: bun install
+        working-directory: src
+      # Assemble _site for the prod prefix: marketing homepage at the root, the
+      # web app under /app/, the module demos under /demos/. See build-site.sh.
+      - name: Build site
+        run: .github/scripts/build-site.sh
+        env:
+          # Served at the custom domain root (www.tamedtable.com), so the base
+          # is "/", not "/TamedTable/". App → /app/, demos → /demos/.
+          SITE_BASE: /
+          OUT_DIR: _site
+      # Smoke-test the demo bundles in headless Chromium before deploying.
+      # A cache hit above makes this install a no-op.
+      - run: bunx playwright install chromium
+        working-directory: src
+      - run: bun run test:smoke
+        working-directory: src
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
+          publish_branch: gh-pages
+          keep_files: true  # don't wipe pr-preview/ subdirs
+          # Re-assert the custom domain on every deploy so the CNAME file is
+          # never dropped from gh-pages. Change this if the apex domain
+          # (tamedtable.com) becomes primary instead of www.
+          cname: www.tamedtable.com
