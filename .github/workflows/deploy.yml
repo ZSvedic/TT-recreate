@@ -1,14 +1,20 @@
 name: Deploy site to GitHub Pages
-# NOTE (recreation): manual-only until the recreated web package ships its
-# browser build (`bun run build` in src/packages/web) and per-package demos —
-# build-site.sh depends on both. Restore the push-paths trigger when they land;
-# the original trigger is preserved in git history.
+# Publishes to the gh-pages branch (Pages source: "Deploy from a branch") as
+# project pages at https://zsvedic.github.io/TT-recreate/ — this recreation
+# repo has no custom domain. The branch source is shared with PR previews:
+# prod lives at the branch root, previews under pr-preview/pr-<N>/. keep_files
+# preserves those preview subdirs when prod redeploys.
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'spec/**'
+      - 'cassettes/**'
+      - 'marketing/web/**'
+      - '.github/workflows/deploy.yml'
+      - '.github/scripts/build-site.sh'
   workflow_dispatch:  # manual rebuild from the Actions tab
-# Publishes to the gh-pages branch (Pages source: "Deploy from a branch"). The
-# branch source is shared with PR previews (pr-preview.yml): prod lives at the
-# branch root, previews under pr-preview/pr-<N>/. keep_files preserves those
-# preview subdirs when prod redeploys.
 permissions:
   contents: write
 concurrency:
@@ -21,8 +27,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
       # Same cache as ci.yml (bun store + Playwright Chromium, keyed on
-      # bun.lock), so a deploy reuses the browser a CI run already downloaded —
-      # the fresh ~150MB download made the smoke gate slow and flaky.
+      # bun.lock), so a deploy reuses what a CI run already downloaded.
       - uses: actions/cache@v4
         with:
           path: |
@@ -33,27 +38,17 @@ jobs:
       - run: bun install
         working-directory: src
       # Assemble _site for the prod prefix: marketing homepage at the root, the
-      # web app under /app/, the module demos under /demos/. See build-site.sh.
+      # web app under /app/, module demos under /demos/, and the static tour
+      # data (tutorials/, samples/, cassettes/). See build-site.sh.
       - name: Build site
         run: .github/scripts/build-site.sh
         env:
-          # Served at the custom domain root (www.tamedtable.com), so the base
-          # is "/", not "/TamedTable/". App → /app/, demos → /demos/.
-          SITE_BASE: /
+          # Project pages: served under the repo prefix, not a domain root.
+          SITE_BASE: /TT-recreate/
           OUT_DIR: _site
-      # Smoke-test the demo bundles in headless Chromium before deploying.
-      # A cache hit above makes this install a no-op.
-      - run: bunx playwright install chromium
-        working-directory: src
-      - run: bun run test:smoke
-        working-directory: src
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./_site
           publish_branch: gh-pages
           keep_files: true  # don't wipe pr-preview/ subdirs
-          # Re-assert the custom domain on every deploy so the CNAME file is
-          # never dropped from gh-pages. Change this if the apex domain
-          # (tamedtable.com) becomes primary instead of www.
-          cname: www.tamedtable.com

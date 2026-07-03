@@ -66,6 +66,35 @@
   (`i === <row> ? "<value>" : row["<col>"]`); column drag reorders
   `spec.columns`. Undo pops a journal of whole-spec snapshots (the timeline /
   jumpTo surface is deferred with the mobile shell).
-- **CI runs `test:web:app`** (app features only, Node) — the package demo
-  scenarios need demo pages + headless Chromium and are not implemented;
-  `deploy.yml` is manual-only until the web build + demos exist.
+- **Package demos and the browser shell are plain DOM, not React.** The
+  package behavior.md files describe React components, but the observable
+  behavior (the @web demo scenarios, the deployed tours) sees only DOM
+  attributes and callbacks; every package ships a `dom.ts` "props in,
+  callbacks out" component instead, and `src/packages/web/app.ts` renders the
+  shell the same way. Smaller, no new runtime dependency.
+- **Demo test harness**: each package's `*.steps.ts` builds its `demo.ts`
+  with `Bun.build` into a gitignored `.demo-dist/`, serves it with
+  `Bun.serve` (port 0), and launches Chromium with a fallback to the
+  container binary (`executablePath: '/opt/pw-browsers/chromium'`) when the
+  pinned playwright revision isn't downloaded.
+- **gherkin-tour's spec had no @web demo scenarios** — two were added to
+  `spec/packages/gherkin-tour/gherkin-tour.feature` (spec-first) so the
+  package demo is covered like every other package's.
+- **The content matcher lives in `@tamedtable/cassette` (`matcher.ts`)** —
+  moved out of `src/tests/cassette.ts` (it was already pure) so the browser's
+  key-free tour replay and the Node test recorder share one matcher.
+  `matchedReplayFetch(tape)` = strict fingerprint first, then content match.
+- **Browser build is `Bun.build`, not Vite** (the contract's Vite/main.tsx
+  wiring predates the recreation): `bun run build` in `src/packages/web`
+  bundles `app.ts` with `node:fs`/`node:path` mapped to shims (an in-memory
+  file map plus a synchronous same-origin XHR fallback so the engine's
+  `readFileSync` can pull deployed `samples/` on demand), DuckDB/apache-arrow
+  stubbed to throw on use (SQL/parquet/arrow are unavailable in the browser
+  demo), and a minimal `Buffer` shim for the csv codecs. The prompt file,
+  tutorial manifest, sample list, and `TAMEDTABLE_WEB_BASE` are baked in as
+  defines.
+- **Deployment is project pages** (`https://zsvedic.github.io/TT-recreate/`,
+  `SITE_BASE=/TT-recreate/`, no CNAME): marketing site at the root, app under
+  `app/`, demos under `demos/<name>/`, static `tutorials/` + `samples/` +
+  `cassettes/` at the root (the app fetches them relative to the site base,
+  not the app dir).
