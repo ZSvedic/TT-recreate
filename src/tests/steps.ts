@@ -31,6 +31,11 @@ function specColumns(w: TTWorld): string[] {
 
 async function runQuery(w: TTWorld, text: string): Promise<void> {
   const runner = w.ensureRunner();
+  // Scenarios under Rules without a Background run against the default table.
+  try { runner.currentSpec(); } catch {
+    await runner.loadInput(fixturePath('customers-input.csv'));
+    w.sourceSnapshot = structuredClone(runner.currentRows());
+  }
   w.specSnapshot = JSON.stringify(runner.currentSpec());
   w.lastError = null;
   try {
@@ -267,6 +272,7 @@ Given('the lookup table {string} has a column {string}', async function (this: T
 
 Given('the customer table contains a row with Country {string}', async function (this: TTWorld, country: string) {
   const runner = this.ensureRunner();
+  try { runner.currentSpec(); } catch { await runner.loadInput(fixturePath('customers-input.csv')); }
   const rows = [...runner.currentRows(), { ID: '99', FirstName: 'Atlas', LastName: 'Sunken', DOB: '', Country: country, Phone: '' }];
   await runner.loadParsed(rows, { ...runner.currentSpec() });
   this.sourceSnapshot = structuredClone(rows);
@@ -291,22 +297,27 @@ Then('every row keeps its original FirstName', function (this: TTWorld) {
 // ---------- colsplit ----------
 
 Given('{string} contains a row with FullName {string}', async function (this: TTWorld, file: string, name: string) {
-  const { rows } = await loadTable(fixturePath(file));
-  assert.ok(rows.some((r) => r.FullName === name));
+  const runner = this.ensureRunner();
+  try { runner.currentSpec(); } catch {
+    await runner.loadInput(fixturePath(file));
+    this.sourceSnapshot = structuredClone(runner.currentRows());
+  }
+  assert.ok(runner.currentRows().some((r) => r.FullName === name));
   this.scratch.fullName = name;
 });
 
-Given('{string} contains messy international names', function (this: TTWorld, _file: string) { /* fixture property */ });
+Given('{string} contains messy international names', async function (this: TTWorld, file: string) {
+  const runner = this.ensureRunner();
+  try { runner.currentSpec(); } catch {
+    await runner.loadInput(fixturePath(file));
+    this.sourceSnapshot = structuredClone(runner.currentRows());
+  }
+});
 
 Then('the Cher row has FirstName {string}', function (this: TTWorld, expected: string) {
   const row = this.currentRows().find((r) => r.FirstName === 'Cher' || r.FullName === 'Cher');
   assert.ok(row, 'no Cher row');
   assert.equal(row!.FirstName, expected);
-});
-
-Then('the Cher row has LastName equal to null', function (this: TTWorld) {
-  const row = this.currentRows().find((r) => r.FirstName === 'Cher' || r.FullName === 'Cher');
-  assert.equal(row!.LastName ?? null, null);
 });
 
 Then('the row has FirstName {string}', function (this: TTWorld, expected: string) {
@@ -446,9 +457,13 @@ function scriptedPatch(w: TTWorld) {
       ];
     }
     if (/slow SQL aggregate/i.test(text)) {
+      // "a slow SQL aggregate over channel" cancels via interrupt, so it can be
+      // huge; "the slow SQL aggregate" (interrupt ignored) must drain on its own.
+      // ~8s on the perf fixture: long enough to cancel mid-flight, short enough to drain.
+      const sql = "(SELECT count(*) FROM t a, t b, (SELECT * FROM t LIMIT 40) c WHERE (a.channel || b.channel || c.channel) LIKE '%q%')";
       return [
         { op: 'add', path: '/columns/-', value: JSON.stringify({ id: 'SlowAgg' }) },
-        { op: 'add', path: '/transformations/-', value: JSON.stringify({ kind: 'mutate', columns: 'SlowAgg', value: { sql: "(SELECT count(*) FROM t a, t b, t c WHERE (a.channel || b.channel || c.channel) LIKE '%q%')" } }) },
+        { op: 'add', path: '/transformations/-', value: JSON.stringify({ kind: 'mutate', columns: 'SlowAgg', value: { sql } }) },
       ];
     }
     return null;

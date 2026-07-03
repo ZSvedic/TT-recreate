@@ -25,7 +25,7 @@ function classifyTape(tape: Tape): Candidate[] {
       const json = JSON.parse(entry.body);
       const parts: any[] = json.candidates?.[0]?.content?.parts ?? [];
       const fc = parts.find((p) => p.functionCall)?.functionCall;
-      if (fc) { out.push({ key, entry, kind: 'patch', opsText: JSON.stringify(fc.args).toLowerCase() }); continue; }
+      if (fc) { out.push({ key, entry, kind: 'patch', opsText: opsContentText(fc.args) }); continue; }
       const text = parts.filter((p) => typeof p.text === 'string').map((p) => p.text).join('').trim();
       try {
         const arr = JSON.parse(text);
@@ -41,6 +41,7 @@ interface ParsedRequest {
   kind: 'patch' | 'batch' | 'single' | 'python';
   userText: string;
   tasks: string[];
+  recovery?: boolean;
 }
 
 function parseRequest(bodyStr: string): ParsedRequest | null {
@@ -50,7 +51,7 @@ function parseRequest(bodyStr: string): ParsedRequest | null {
     const user: string = body.contents?.[0]?.parts?.find((p: any) => p.text)?.text ?? '';
     if (body.tools) {
       const m = user.match(/User request: ([\s\S]*?)(\n\nThe previous patch failed|$)/);
-      return { kind: 'patch', userText: m?.[1] ?? user, tasks: [] };
+      return { kind: 'patch', userText: m?.[1] ?? user, tasks: [], recovery: user.includes('The previous patch failed') };
     }
     if (system.startsWith('You will process several independent micro-tasks')) {
       const tasks = user.split(/\nTask \d+:\n|^Task 1:\n/).map((s) => s.trim()).filter(Boolean);
@@ -61,17 +62,68 @@ function parseRequest(bodyStr: string): ParsedRequest | null {
   } catch { return null; }
 }
 
-const words = (s: string): string[] => (s.toLowerCase().match(/[a-z0-9_%]+/g) ?? []).filter((w) => w.length > 2);
+const words = (s: string): string[] => (s.toLowerCase().match(/[a-z0-9_%]+/g) ?? [])
+  .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+
+const STOPWORDS = new Set(['the', 'and', 'with', 'into', 'for', 'that', 'this', 'each', 'per', 'are', 'has', 'have', 'all', 'row', 'rows', 'column', 'columns', 'add', 'using', 'computed']);
+
+// The content a patch actually carries: column ids, expression bodies, kinds —
+// structural schema keys and patch paths dropped.
+const STRUCT_KEYS = new Set(['kind', 'op', 'path', 'operations', 'value', 'pred', 'columns', 'by', 'agg', 'on', 'with',
+  'how', 'from', 'into', 'drop', 'index', 'values', 'names_to', 'values_to', 'id', 'measures', 'key', 'dir', 'limit',
+  'js', 'sql', 'llm', 'threshold', 'message', 'transcript', 'model']);
+
+function opsContentText(args: Record<string, unknown>): string {
+  const out: string[] = [];
+  const collect = (x: unknown): void => {
+    if (typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean') { out.push(String(x)); return; }
+    if (Array.isArray(x)) { x.forEach(collect); return; }
+    if (x && typeof x === 'object') {
+      const o = x as Record<string, unknown>;
+      if (o.drop === true) out.push('__drop_true');
+      if (o.threshold !== undefined) out.push('__threshold');
+      if (o.how === 'inner') out.push('__inner');
+      for (const [k, v] of Object.entries(o)) {
+        if (k === 'path' || k === 'op' || k === 'how' || k === 'drop') continue;
+        if (!STRUCT_KEYS.has(k)) out.push(k);
+        if (k === 'value' && typeof v === 'string') {
+          try { collect(JSON.parse(v)); continue; } catch { /* plain literal */ }
+        }
+        collect(v);
+      }
+    }
+  };
+  collect(args);
+  return out.join(' ').toLowerCase();
+}
+
+// Multilingual requests carry no English tokens; map their key nouns so the
+// phone-normalization patches outscore unrelated ones.
+const TRANSLATIONS: Array<[RegExp, string]> = [
+  [/tel[eé]fon|téléphone|telefonnummern|telefonske|电话/i, 'phone'],
+];
 
 function scorePatch(userText: string, opsText: string): number {
   let score = 0;
-  for (const w of new Set(words(userText))) if (opsText.includes(w)) score += 1;
-  const wantsThreshold = /%|reject/i.test(userText);
-  if (wantsThreshold === opsText.includes('threshold')) score += 3;
-  const wantsDrop = /drop the original/i.test(userText);
-  if (wantsDrop === /"drop":\s*true|\\"drop\\":true/.test(opsText)) score += 2;
-  const wantsInner = /\binner\b/i.test(userText);
-  if (wantsInner === opsText.includes('"inner"') || wantsInner === opsText.includes('\\"inner\\"')) score += 2;
+  for (const [re, keyword] of TRANSLATIONS) {
+    if (re.test(userText) && opsText.includes(keyword)) score += 2;
+  }
+  for (const w of new Set(words(userText))) {
+    const stem = w.replace(/s$/, '');
+    // Boundary that lets `count` hit `customer_count` but keeps `pivot` out of `unpivot`.
+    const re = new RegExp(`(?<![a-z0-9])${stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+    if (re.test(opsText)) score += 1;
+  }
+  // Aggregate keywords must agree in both directions.
+  for (const agg of ['sum', 'count', 'avg', 'min', 'max']) {
+    const asked = new RegExp(`\\b${agg}\\b`, 'i').test(userText);
+    const offered = new RegExp(`(?<![a-z0-9])${agg}(?![a-z])`).test(opsText);
+    if (asked && offered) score += 2;
+    if (asked !== offered) score -= 1;
+  }
+  if ((/%|reject/i.test(userText)) === opsText.includes('__threshold')) score += 3;
+  if ((/drop the original/i.test(userText)) === opsText.includes('__drop_true')) score += 2;
+  if ((/\binner\b/i.test(userText)) === opsText.includes('__inner')) score += 2;
   return score;
 }
 
@@ -114,6 +166,7 @@ export function makeRecorder(cassettePath: string, opts: RecorderOptions): Fetch
   let tape: Tape = existsSync(cassettePath) ? JSON.parse(readFileSync(cassettePath, 'utf8')) : {};
   let candidates: Candidate[] | null = null;
   const used = new Set<string>();
+  const servedByUser = new Map<string, Set<string>>();
 
   const flush = () => {
     const sorted: Tape = {};
@@ -126,8 +179,10 @@ export function makeRecorder(cassettePath: string, opts: RecorderOptions): Fetch
     let best: Candidate | null = null, bestScore = -Infinity;
     for (const c of list) {
       const s = score(c) + (used.has(c.key) ? 0 : 0.05);
+      if (process.env.TT_MATCH_DEBUG) console.error('CAND', c.key.slice(0,8), s, (c.opsText ?? '').slice(0,60));
       if (s > bestScore) { bestScore = s; best = c; }
     }
+    if (process.env.TT_MATCH_DEBUG) console.error('PICK', best?.key.slice(0,8));
     return best;
   };
 
@@ -153,8 +208,20 @@ export function makeRecorder(cassettePath: string, opts: RecorderOptions): Fetch
     const req = parseRequest(bodyStr);
     if (!req) return null;
     if (req.kind === 'patch') {
-      const c = pick(candidates.filter((c) => c.kind === 'patch'), (c) => scorePatch(req.userText, c.opsText!));
-      if (c) { used.add(c.key); return responseFromEntry(c.entry); }
+      // A recovery turn must not re-serve the patch that just failed for this
+      // same request — that is how the recorded correction gets its turn.
+      const served = servedByUser.get(req.userText) ?? new Set<string>();
+      const pool = candidates.filter((c) => c.kind === 'patch');
+      // Soft penalty: a recovery turn prefers a close-scoring alternative over
+      // the patch that just failed, but a clear winner (e.g. the threshold
+      // validate the scenario is about) keeps getting served.
+      const c = pick(pool, (c) => scorePatch(req.userText, c.opsText!) - (req.recovery && served.has(c.key) ? 1.5 : 0));
+      if (c) {
+        used.add(c.key);
+        served.add(c.key);
+        servedByUser.set(req.userText, served);
+        return responseFromEntry(c.entry);
+      }
       return null;
     }
     if (req.kind === 'python') {

@@ -419,6 +419,7 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions = {}): Runner &
                     else signal.addEventListener('abort', arm, { once: true });
                   }),
                 ]);
+                if (signal.aborted) throw new Error('cancelled');
               } catch (raceErr) {
                 if ((raceErr as Error).message === 'cancelled') {
                   let settled = false;
