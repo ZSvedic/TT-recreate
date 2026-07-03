@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>file-io demo — TamedTable</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; color: #281C60; }
+    button { cursor: pointer; }
+    #fio-error { color: #B00020; }
+    #fio-preview { white-space: pre; font-family: monospace; font-size: 12px;
+                   border: 1px solid #DCDCDC; padding: 8px; min-height: 1em; overflow-x: auto; }
+    #out { white-space: pre-line; font-family: monospace; font-size: 12px; color: #555;
+           border-top: 1px solid #DCDCDC; margin-top: 12px; padding-top: 8px; }
+  </style>
+<script type="module" crossorigin src="/TT-recreate/demos/file-io/demo-mp6c82qm.js"></script></head>
+<body>
+  <h1>@tamedtable/file-io demo</h1>
+  <p id="fio-fsa"></p>
+  <p>
+    <button id="fio-open">Open…</button>
+    <input id="fio-url" type="text" size="50" placeholder="https://…/table.csv" />
+    <button id="fio-fetch">Fetch URL</button>
+    <button id="fio-save">Save</button>
+  </p>
+  <p>name: <span id="fio-name"></span> · format: <span id="fio-format"></span>
+     · <span id="fio-outcome"></span></p>
+  <p id="fio-error"></p>
+  <div id="fio-preview"></div>
+  <div id="out"></div>
+  
+</body>
+</html>
