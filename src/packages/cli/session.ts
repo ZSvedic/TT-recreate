@@ -188,7 +188,7 @@ export class CliSession {
       }
       case ':save': {
         if (!arg) { this.out(':save: missing path'); break; }
-        if (!formatForExtension(arg)) { this.out(':save: unknown file type'); break; }
+        if (!/\.(csv|jsonl)$/i.test(arg)) { this.out(':save: unknown file type'); break; }
         try {
           await writeRows(isAbsolute(arg) ? arg : join(this.cwd, arg), this.runner.currentRows(), this.displayColumns());
           this.out(`saved ${arg}`);

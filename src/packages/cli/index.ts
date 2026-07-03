@@ -107,7 +107,7 @@ async function execute(
   }
   const inputPath = input ? resolveInput(input, ctx.cwd) : join(dirname(resolvedFlow), flow.source ?? '');
   const outPath = isAbsolute(output) ? output : join(ctx.cwd, output);
-  if (!formatForExtension(outPath)) return fail(4, `:save: unknown file type ${output}`);
+  if (!/\.(csv|jsonl)$/i.test(outPath)) return fail(4, `:save: unknown file type ${output}`);
 
   const runner = createHeadlessRunner({ ...ctx.runnerOpts, cwd: ctx.cwd });
   try {

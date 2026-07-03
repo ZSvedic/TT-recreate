@@ -203,16 +203,21 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions = {}): Runner &
       if (!promptRows.has(p)) promptRows.set(p, []);
       promptRows.get(p)!.push(i);
     });
-    const uniques = [...promptRows.keys()];
-    const pending = uniques.filter((p) => !cache.has(`${cellModel}\n${p}`));
-    for (const p of uniques.filter((p) => cache.has(`${cellModel}\n${p}`))) {
-      for (const i of promptRows.get(p)!) results[i] = cache.get(`${cellModel}\n${p}`)!;
-    }
+    const cacheKey = (p: string) => `${cellModel}\n${p}`;
+    // Every uncached prompt occurrence in row order, duplicates kept — one
+    // batch is one model call, so duplicate cells in a batch ride along
+    // (matches the recorded batches). A batch dispatching later drops prompts
+    // that are cached or already in flight; those rows backfill from cache.
+    const pending = prompts.filter((p) => !cache.has(cacheKey(p)));
     const batches: string[][] = [];
     for (let i = 0; i < pending.length; i += batchSize) batches.push(pending.slice(i, i + batchSize));
+    const inFlightPrompts = new Set<string>();
     const temperatureOk = acceptsTemperature(cellModel);
 
-    const runBatch = async (batch: string[]) => {
+    const runBatch = async (rawBatch: string[]) => {
+      const batch = rawBatch.filter((p) => !cache.has(cacheKey(p)) && !inFlightPrompts.has(p));
+      if (batch.length === 0) return;
+      for (const p of batch) inFlightPrompts.add(p);
       let values: (string | null)[] | null = null;
       if (batch.length === 1) {
         const reply = await client.cellSingle(cellModel, batch[0]!, temperatureOk);
@@ -237,8 +242,12 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions = {}): Runner &
       const indices: number[] = [];
       const flat: (string | null)[] = [];
       batch.forEach((p, k) => {
-        cache.set(`${cellModel}\n${p}`, values![k]!);
-        for (const i of promptRows.get(p)!) { results[i] = values![k]!; indices.push(i); flat.push(values![k]!); }
+        cache.set(cacheKey(p), values![k]!);
+        inFlightPrompts.delete(p);
+        for (const i of promptRows.get(p) ?? []) {
+          if (results[i] !== undefined) continue;
+          results[i] = values![k]!; indices.push(i); flat.push(values![k]!);
+        }
       });
       cellOpts.onBatch?.(indices, flat);
     };
@@ -253,9 +262,14 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions = {}): Runner &
     }
     await Promise.allSettled([...inFlight]);
     if (cancelled || signal?.aborted) throw new Error('cancelled');
-    // Surface the first real batch error, if any prompt stayed unresolved.
-    for (let i = 0; i < prompts.length; i++) if (results[i] === undefined) {
-      await runBatch([prompts[i]!]).catch((e) => { throw e; });
+    // Backfill rows resolved by another batch's cache entry; anything still
+    // unresolved retries as its own call so a real error surfaces.
+    for (let i = 0; i < prompts.length; i++) {
+      if (results[i] !== undefined) continue;
+      const hit = cache.get(cacheKey(prompts[i]!));
+      if (hit !== undefined) { results[i] = hit; continue; }
+      await runBatch([prompts[i]!]);
+      if (results[i] === undefined) results[i] = cache.get(cacheKey(prompts[i]!)) ?? null;
     }
     return results;
   };

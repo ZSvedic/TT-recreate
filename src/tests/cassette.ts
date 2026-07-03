@@ -103,10 +103,24 @@ const TRANSLATIONS: Array<[RegExp, string]> = [
   [/tel[eé]fon|téléphone|telefonnummern|telefonske|电话/i, 'phone'],
 ];
 
+// Verb → transformation-kind hints: "Show only …" wants a filter, not a mutate.
+const KIND_HINTS: Array<[RegExp, string]> = [
+  [/\b(show|only|keep|filter|drop duplicates|remove duplicate)\b/i, 'filter'],
+  [/\b(normalize|normaliz|fix|clean|translate|summarize|classify|extract|convert|capitaliz)/i, 'mutate'],
+  [/\bsort\b/i, 'sort'],
+  [/\bjoin\b/i, 'join'],
+  [/\b(validate|flag|check)\b/i, 'validate'],
+  [/\bunpivot\b/i, 'unpivot'],
+  [/\bgroup\b|\bcount\b|\baggregate\b/i, 'group'],
+];
+
 function scorePatch(userText: string, opsText: string): number {
   let score = 0;
   for (const [re, keyword] of TRANSLATIONS) {
     if (re.test(userText) && opsText.includes(keyword)) score += 2;
+  }
+  for (const [re, kind] of KIND_HINTS) {
+    if (re.test(userText)) score += new RegExp(`(?<![a-z0-9])${kind}`).test(opsText) ? 2 : -1;
   }
   for (const w of new Set(words(userText))) {
     const stem = w.replace(/s$/, '');

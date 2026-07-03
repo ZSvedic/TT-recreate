@@ -159,10 +159,6 @@ Given('{string} exists with join.with = {string}', function (this: TTWorld, name
   assert.equal(flow.spec.transformations[0].with, withPath);
 });
 
-Then('{string} exists', function (this: TTWorld, name: string) {
-  assert.ok(existsSync(fixturePath(name)), `${name} not found`);
-});
-
 Then('the first line of {string} is {string}', function (this: TTWorld, name: string, expected: string) {
   assert.equal(readFileSync(fixturePath(name), 'utf8').split('\n')[0], expected);
 });
@@ -180,7 +176,7 @@ async function invokeCli(w: TTWorld, command: string): Promise<void> {
   const res = await runCli(args, {
     out: (l) => { stdout += l + '\n'; },
     err: () => { /* collected via res.stderr */ },
-    cwd: SRC_DIR,
+    cwd: TEMP,
     runnerOpts: w.runnerOpts(),
     stdin: args.length && !args[0]!.startsWith('-') && args[0] !== 'execute' && args[0] !== 'help' ? '' : undefined,
   });
