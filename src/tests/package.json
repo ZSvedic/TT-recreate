@@ -14,6 +14,7 @@
     "@tamedtable/voice-input": "workspace:*",
     "@tamedtable/table-view": "workspace:*",
     "@tamedtable/toolbar": "workspace:*",
-    "@tamedtable/ui-kit": "workspace:*"
+    "@tamedtable/ui-kit": "workspace:*",
+    "@tamedtable/web": "workspace:*"
   }
 }

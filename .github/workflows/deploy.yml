@@ -1,22 +1,9 @@
 name: Deploy site to GitHub Pages
+# NOTE (recreation): manual-only until the recreated web package ships its
+# browser build (`bun run build` in src/packages/web) and per-package demos —
+# build-site.sh depends on both. Restore the push-paths trigger when they land;
+# the original trigger is preserved in git history.
 on:
-  push:
-    branches: [main]
-    paths:
-      # Rebuild when the web bundle, the marketing homepage, or its shared
-      # assets change. Doc-only / process-only commits should not redeploy.
-      - 'src/packages/web/**'
-      - 'src/packages/core/**'
-      - 'src/packages/headless/**'
-      - 'src/packages/model-config/**'
-      - 'src/packages/gherkin-tour/**'
-      - 'src/package.json'
-      - 'src/bun.lock'
-      - 'marketing/web/**'
-      - 'marketing/illustrations/**'
-      - 'marketing/brand/**'
-      - '.github/workflows/deploy.yml'
-      - '.github/scripts/build-site.sh'
   workflow_dispatch:  # manual rebuild from the Actions tab
 # Publishes to the gh-pages branch (Pages source: "Deploy from a branch"). The
 # branch source is shared with PR previews (pr-preview.yml): prod lives at the

@@ -35,3 +35,37 @@
   `cancelation.json` batches (arrays of 2).
 - **Toast duration model**: `clamp(chars × 80 ms, 3 s, 12 s)` — fits all three
   pinned points in ui-kit.feature.
+- **WebController is a plain TS class, host I/O injected.** The `@web` app
+  scenarios drive it in Node: the world injects `writeFile`,
+  `resolveFixturePath`, `saveDir`, tutorial loaders (fs reads), and the replay
+  fetch factory. The React shell / Vite build is not implemented yet, so the
+  browser-only surfaces (mobile shell, history timeline, TourUi) are absent.
+- **Test controller starts with a Gemini key present** (`GEMINI_API_KEY=
+  placeholder-key` in the injected env). save-py's `@web` scenario exports
+  Python with no key Given, while the keyless-toast scenarios all say "the API
+  key has not been set" first — so that step *clears* keys rather than
+  describing the default.
+- **"the provider X has API key Y" also selects provider X.** web.feature's
+  "not Anthropic's" scenario overrides with an explicit select afterwards;
+  voice and diagnostics scenarios rely on the implicit selection.
+- **Voice replay uses a clip-name hint.** A voice patch turn's user text (the
+  deterministic voice prompt) is identical for every clip over the same table,
+  so the recorder can't discriminate by content. The step that wires a stub
+  mic/clip sets `recorder.voiceHint = <clip name>`; the matcher scores the
+  hint's tokens (validate/normalize/dob/phone) against the recorded ops +
+  transcript.
+- **Content-matcher additions for @web-only tours**: (1) a patch request with
+  zero positive evidence against every candidate is a genuine miss (pins the
+  tutorial-replay-miss diagnostics scenario); (2) instruction-keyed batch
+  affinity hints — street/city/state/zip shapes, numeric ranges (1–5 vs
+  1–100), language-name vs translation, translation word-stem echo; (3) tiny
+  yes/no oracles (fake-email, city↔country gazetteer, price plausibility) used
+  only to pick among same-length recorded yes/no arrays. All served bytes
+  still come from the committed cassettes.
+- **Cell edits patch the spec as a positional `{js}` mutate**
+  (`i === <row> ? "<value>" : row["<col>"]`); column drag reorders
+  `spec.columns`. Undo pops a journal of whole-spec snapshots (the timeline /
+  jumpTo surface is deferred with the mobile shell).
+- **CI runs `test:web:app`** (app features only, Node) — the package demo
+  scenarios need demo pages + headless Chromium and are not implemented;
+  `deploy.yml` is manual-only until the web build + demos exist.

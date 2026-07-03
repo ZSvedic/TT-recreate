@@ -4,11 +4,12 @@
   "workspaces": ["packages/*", "tests"],
   "scripts": {
     "setup": "bun install",
-    "test": "bun run test:unit && bun run test:headless && bun run test:cli",
+    "test": "bun run test:unit && bun run test:headless && bun run test:cli && bun run test:web:app",
     "test:unit": "bun test packages",
     "test:headless": "bun tests/run-cucumber.ts headless",
     "test:cli": "bun tests/run-cucumber.ts cli",
     "test:web": "bun tests/run-cucumber.ts web",
+    "test:web:app": "TAMEDTABLE_SCOPE=app bun tests/run-cucumber.ts web",
     "test:record": "TAMEDTABLE_CASSETTE=record bun tests/run-cucumber.ts headless && TAMEDTABLE_CASSETTE=record bun tests/run-cucumber.ts cli",
     "typecheck": "tsc --noEmit"
   },

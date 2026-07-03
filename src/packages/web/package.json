@@ -1,0 +1,16 @@
+{
+  "name": "@tamedtable/web",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./index.ts" },
+  "dependencies": {
+    "@tamedtable/cassette": "workspace:*",
+    "@tamedtable/core": "workspace:*",
+    "@tamedtable/file-io": "workspace:*",
+    "@tamedtable/gherkin-tour": "workspace:*",
+    "@tamedtable/headless": "workspace:*",
+    "@tamedtable/model-config": "workspace:*",
+    "@tamedtable/table-view": "workspace:*",
+    "@tamedtable/voice-input": "workspace:*"
+  }
+}

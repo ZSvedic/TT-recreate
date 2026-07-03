@@ -11,6 +11,7 @@ import { runCli, CliSession } from '@tamedtable/cli';
 import { TTWorld, fixturePath, readJsonlFile, SRC_DIR, TEMP, FIXTURES } from './world.ts';
 import { makeRecorder } from './cassette.ts';
 import './steps-lib.ts';
+import './steps-web.ts';
 
 const quoted = (s: string): string[] => [...s.matchAll(/"([^"]*)"/g)].map((m) => m[1]!);
 const unescapeLine = (s: string): string => s.replace(/\\n/g, '\n');
@@ -48,7 +49,8 @@ async function runQuery(w: TTWorld, text: string): Promise<void> {
 // ---------- loading ----------
 
 Given('load {string}', async function (this: TTWorld, name: string) {
-  await this.ensureRunner().loadInput(fixturePath(name));
+  if (this.profile === 'web' && !this.runner) await this.ensureController().loadFixture(name);
+  else await this.ensureRunner().loadInput(fixturePath(name));
   this.sourceSnapshot = structuredClone(this.currentRows());
 });
 
@@ -56,7 +58,9 @@ Given('the expected output is {string}', function (this: TTWorld, name: string) 
   this.golden = fixturePath(name);
 });
 
-Given('the TamedTable web app', function (this: TTWorld) { /* controller == runner on this surface */ });
+Given('the TamedTable web app', function (this: TTWorld) {
+  if (this.profile === 'web') this.ensureController();
+});
 
 Given('the columns are {string}', function (this: TTWorld, cols: string) {
   assert.deepEqual(specColumns(this), cols.split(',').map((s) => s.trim()));
@@ -468,7 +472,7 @@ function scriptedPatch(w: TTWorld) {
 
 Given('a request that introduces an invalid SQL fragment', async function (this: TTWorld) {
   this.extraRunnerOpts.patchScript = scriptedPatch(this);
-  this.runner = null;
+  await this.resetEngine();
   await this.ensureRunner().loadInput(fixturePath('customers-input.csv'));
   this.scratch.pendingQuery = 'introduce an invalid SQL fragment';
 });
@@ -489,9 +493,10 @@ Then('the final commit either succeeds within the recovery budget or throws', fu
 When('query {string} via SQL', async function (this: TTWorld, text: string) {
   if (!this.extraRunnerOpts.patchScript) {
     this.extraRunnerOpts.patchScript = scriptedPatch(this);
-    const loaded = this.runner ? structuredClone(this.currentRows()) : null;
-    const spec = this.runner ? this.ensureRunner().currentSpec() : null;
-    this.runner = null;
+    let loaded: Row[] | null = null;
+    let spec: TablePlan | null = null;
+    try { loaded = structuredClone(this.currentRows()); spec = this.ensureRunner().currentSpec(); } catch { /* nothing loaded */ }
+    await this.resetEngine();
     if (loaded && spec) await this.ensureRunner().loadParsed(loaded, spec);
   }
   const runner = this.ensureRunner();
@@ -537,7 +542,7 @@ Then('the second request commits successfully', function (this: TTWorld) {
 
 Given('the column {string} has been added via SQL', async function (this: TTWorld, col: string) {
   this.extraRunnerOpts.patchScript = scriptedPatch(this);
-  this.runner = null;
+  await this.resetEngine();
   await this.ensureRunner().loadInput(fixturePath('performance-liked-videos.csv'));
   await runQuery(this, `Add column ${col} computed in SQL as upper(channel)`);
   assert.equal(this.lastError, null, this.lastError?.message);

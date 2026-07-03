@@ -79,6 +79,19 @@
       "name": "@tamedtable/voice-input",
       "version": "0.1.0",
     },
+    "packages/web": {
+      "name": "@tamedtable/web",
+      "dependencies": {
+        "@tamedtable/cassette": "workspace:*",
+        "@tamedtable/core": "workspace:*",
+        "@tamedtable/file-io": "workspace:*",
+        "@tamedtable/gherkin-tour": "workspace:*",
+        "@tamedtable/headless": "workspace:*",
+        "@tamedtable/model-config": "workspace:*",
+        "@tamedtable/table-view": "workspace:*",
+        "@tamedtable/voice-input": "workspace:*",
+      },
+    },
     "tests": {
       "name": "@tamedtable/tests",
       "dependencies": {
@@ -94,6 +107,7 @@
         "@tamedtable/toolbar": "workspace:*",
         "@tamedtable/ui-kit": "workspace:*",
         "@tamedtable/voice-input": "workspace:*",
+        "@tamedtable/web": "workspace:*",
       },
     },
   },
@@ -171,6 +185,8 @@
     "@tamedtable/ui-kit": ["@tamedtable/ui-kit@workspace:packages/ui-kit"],
 
     "@tamedtable/voice-input": ["@tamedtable/voice-input@workspace:packages/voice-input"],
+
+    "@tamedtable/web": ["@tamedtable/web@workspace:packages/web"],
 
     "@teppeis/multimaps": ["@teppeis/multimaps@3.0.0", "", {}, "sha512-ID7fosbc50TbT0MK0EG12O+gAP3W3Aa/Pz4DaTtQtEvlc9Odaqi0de+xuZ7Li2GtK4HzEX7IuRWS/JmZLksR3Q=="],
 
