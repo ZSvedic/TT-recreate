@@ -37,6 +37,21 @@ Session 3 added:
 
 ## Remaining
 
+- **Pages needs one manual click** — everything is built and the deploy
+  workflow is green up to publishing, but *creating* the Pages site needs
+  repo admin, which `GITHUB_TOKEN` does not have here (both the REST call
+  and `actions/configure-pages` `enablement` got 403 "Resource not
+  accessible by integration"). Owner: Settings → Pages → Source **GitHub
+  Actions**, then re-run the "Deploy site to GitHub Pages" workflow (or push
+  to main). The site content was verified end to end against the deployed
+  `gh-pages` bytes: the deep link
+  `/app/?feature=filter.feature&scenario=Filter by Country` replays the tour
+  key-free (10 rows → 4 USA rows, 1 filter transformation). The `gh-pages`
+  branch from deploy run #3 holds a full site copy and becomes unused under
+  the Actions flow.
+- `pr-preview.yml` predates the Actions-flow deploy and needs rework before
+  PR previews return (deploy-pages replaces the whole site per deploy; the
+  old design kept previews as subdirs of the gh-pages branch).
 - `bench` package, `test:smoke` / `test:e2e` scripts (the original's
   smoke/e2e gates; the deploy workflow currently deploys after CI without a
   dedicated smoke step).
