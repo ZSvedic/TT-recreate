@@ -24,7 +24,7 @@ const paths = only
 const { runConfiguration } = await loadConfiguration({
   provided: {
     paths,
-    import: [join(import.meta.dir, 'steps.ts')],
+    import: [join(import.meta.dir, 'steps.ts'), join(import.meta.dir, '..', 'packages/*/*.steps.ts')],
     tags: `@${profile} and not @perf and not @needs-recording`,
     format: ['progress'],
     parallel: 0,
