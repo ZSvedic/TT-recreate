@@ -21,6 +21,10 @@
       "name": "@tamedtable/cassette",
       "version": "0.1.0",
     },
+    "packages/chat-panel": {
+      "name": "@tamedtable/chat-panel",
+      "version": "0.1.0",
+    },
     "packages/cli": {
       "name": "@tamedtable/cli",
       "version": "0.1.0",
@@ -162,6 +166,8 @@
     "@swc/helpers": ["@swc/helpers@0.5.23", "", { "dependencies": { "tslib": "^2.8.0" } }, "sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw=="],
 
     "@tamedtable/cassette": ["@tamedtable/cassette@workspace:packages/cassette"],
+
+    "@tamedtable/chat-panel": ["@tamedtable/chat-panel@workspace:packages/chat-panel"],
 
     "@tamedtable/cli": ["@tamedtable/cli@workspace:packages/cli"],
 

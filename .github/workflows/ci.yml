@@ -18,24 +18,28 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
-      # Cache the bun install store, keyed on bun.lock, so a run only pays the
-      # install cost when dependencies change. (The Playwright Chromium cache
-      # returns with the package demo suite — see temp/recreate-status.md.)
+      # Cache the bun install store and the Playwright browser download — both
+      # keyed on bun.lock, so a run only pays the install/download cost when
+      # dependencies change. The Chromium download is the slowest CI step.
       - uses: actions/cache@v4
         with:
-          path: ~/.bun/install/cache
+          path: |
+            ~/.bun/install/cache
+            ~/.cache/ms-playwright
           key: deps-${{ runner.os }}-${{ hashFiles('src/bun.lock') }}
           restore-keys: deps-${{ runner.os }}-
       - run: bun install
         working-directory: src
       - run: bun run typecheck
         working-directory: src
+      # The @web cucumber profile's package demos drive headless Chromium;
+      # `bun install` alone does not fetch the browser binary. `--with-deps`
+      # is skipped — a cache hit makes the install a no-op.
+      - run: bunx playwright install chromium
+        working-directory: src
       # Offline + key-free: the runner defaults TAMEDTABLE_CASSETTE=replay, so
       # every model call is served from a recorded cassette. No secrets needed.
+      # `bun run test` covers unit + @headless + @cli + full @web (app
+      # scenarios in Node, package demos in headless Chromium).
       - run: bun run test
-        working-directory: src
-      # App-level @web scenarios (WebController in Node — no browser). The
-      # package demo scenarios (headless Chromium) are not implemented yet, so
-      # the full `test:web` profile stays out of `bun run test` for now.
-      - run: bun run test:web:app
         working-directory: src

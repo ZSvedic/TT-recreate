@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gherkin-tour demo — TamedTable</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; color: #281C60; }
+    button { cursor: pointer; }
+    #out { white-space: pre-line; font-family: monospace; font-size: 12px; color: #555;
+           border-top: 1px solid #DCDCDC; margin-top: 12px; padding-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>@tamedtable/gherkin-tour demo</h1>
+  <p>tour: <span id="gt-name"></span> · <span id="gt-count"></span> steps
+     · state: <span id="gt-state">inactive</span></p>
+  <p>
+    <button id="gt-play">Play</button>
+    <button id="gt-next">Next</button>
+  </p>
+  <div id="out"></div>
+  <script src="./demo.js"></script>
+</body>
+</html>
