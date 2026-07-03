@@ -13,9 +13,13 @@ process.env.TAMEDTABLE_CASSETTE ??= 'replay';
 process.env.TAMEDTABLE_PROFILE = profile;
 
 const only = process.env.TAMEDTABLE_FEATURES?.split(',').map((s) => s.trim()).filter(Boolean);
+// TAMEDTABLE_SCOPE=app: app features only (spec/test-cases), no package demos.
+const all = process.env.TAMEDTABLE_SCOPE === 'app'
+  ? ['../spec/test-cases/*.feature']
+  : ['../spec/test-cases/*.feature', '../spec/packages/*/*.feature'];
 const paths = only
   ? only.flatMap((n) => [`../spec/test-cases/${n}.feature`, `../spec/packages/${n}/${n}.feature`])
-  : ['../spec/test-cases/*.feature', '../spec/packages/*/*.feature'];
+  : all;
 
 const { runConfiguration } = await loadConfiguration({
   provided: {
