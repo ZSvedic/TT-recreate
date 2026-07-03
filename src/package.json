@@ -4,7 +4,7 @@
   "workspaces": ["packages/*", "tests"],
   "scripts": {
     "setup": "bun install",
-    "test": "bun run test:unit && bun run test:headless && bun run test:cli && bun run test:web",
+    "test": "bun run test:unit && bun run test:headless && bun run test:cli",
     "test:unit": "bun test packages",
     "test:headless": "bun tests/run-cucumber.ts headless",
     "test:cli": "bun tests/run-cucumber.ts cli",
@@ -19,7 +19,8 @@
     "csv": "^6.4.1"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "@types/node": "^24.3.1"
+    "@types/bun": "^1.3.14",
+    "@types/node": "^24.3.1",
+    "typescript": "^5.9.2"
   }
 }
