@@ -189,6 +189,41 @@ Feature: Web front-end
       And user undoes the last change
       Then the first column is "ID"
 
+    @web
+    Scenario: Redo restores an undone change
+      When user edits cell at row 1 column "Country" to "United States"
+      And user undoes the last change
+      And user redoes the last change
+      Then cell at row 1 column "Country" shows "United States"
+      And the spec has 1 transformation
+
+    @web
+    Scenario: The history timeline lists the load and every change, newest current
+      When user edits cell at row 1 column "Country" to "United States"
+      And user reorders columns so "Country" comes first
+      Then the history timeline shows 3 entries
+      And the history cursor is at entry 2
+      And history entry 0 is labelled "Loaded customers-input.csv"
+      And history entry 1 is labelled "edit Country"
+
+    @web
+    Scenario: Jumping the history to an earlier point restores that state
+      When user edits cell at row 1 column "Country" to "United States"
+      And user reorders columns so "Country" comes first
+      And user jumps to history entry 0
+      Then the spec has 0 transformations
+      And the history cursor is at entry 0
+      When user jumps to history entry 2
+      Then the first column is "Country"
+
+    @web
+    Scenario: A new change after undo clears the redone tail
+      When user edits cell at row 1 column "Country" to "United States"
+      And user undoes the last change
+      And user reorders columns so "Country" comes first
+      Then the history timeline shows 2 entries
+      And the history cursor is at entry 1
+
   Rule: The table view paginates long tables
 
     Background:

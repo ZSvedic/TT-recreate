@@ -145,7 +145,7 @@ browser binary `bun install` alone does not fetch.
 | `bun run test:headless` | The Cucumber `@headless` profile only. |
 | `bun run test:cli` | The Cucumber `@cli` profile only. |
 | `bun run test:web` | The Cucumber `@web` profile only. Drives the demos in headless Chromium, so it needs the browser from `bun run setup` (or `bunx playwright install chromium`). |
-| `bun run test:smoke` | The module-demo smoke test: builds each demo with the deploy workflow's flags and drives it in headless Chromium. Needs a Chromium binary (`bunx playwright install chromium`); not part of `bun run test`. |
+| `bun run test:smoke` | The deploy smoke gate: assembles the full site (`build-site.sh`), serves it locally, and checks the deployed bytes in headless Chromium — homepage, every demo page's `#out`, and the filter-tour deep link. `deploy.yml` runs it before publishing (`SMOKE_SITE_DIR` reuses an existing build). Needs a Chromium binary (`bunx playwright install chromium`); not part of `bun run test`. |
 | `bun run test:record` | Re-records the cassettes (see below) against the live Gemini API. |
 | `bun run typecheck` | Type-check only — `tsc --noEmit` for the engine packages and the web package. |
 

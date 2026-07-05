@@ -54,6 +54,15 @@ jobs:
           # Project pages: served under the repo prefix, not a domain root.
           SITE_BASE: /TT-recreate/
           OUT_DIR: _site
+      # Smoke-gate the exact bytes about to deploy: every demo's #out signals
+      # ready and the filter-tour deep link replays to completion (tests/smoke.ts).
+      - run: bunx playwright install chromium
+        working-directory: src
+      - name: Smoke test the built site
+        run: bun run test:smoke
+        working-directory: src
+        env:
+          SMOKE_SITE_DIR: ${{ github.workspace }}/_site
       # enablement: true creates the Pages site on first run (idempotent).
       - uses: actions/configure-pages@v5
         with:
