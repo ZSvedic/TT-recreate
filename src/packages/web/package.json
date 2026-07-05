@@ -7,12 +7,15 @@
   },
   "dependencies": {
     "@tamedtable/cassette": "workspace:*",
+    "@tamedtable/chat-panel": "workspace:*",
     "@tamedtable/core": "workspace:*",
     "@tamedtable/file-io": "workspace:*",
     "@tamedtable/gherkin-tour": "workspace:*",
     "@tamedtable/headless": "workspace:*",
     "@tamedtable/model-config": "workspace:*",
     "@tamedtable/table-view": "workspace:*",
+    "@tamedtable/toolbar": "workspace:*",
+    "@tamedtable/ui-kit": "workspace:*",
     "@tamedtable/voice-input": "workspace:*"
   },
   "scripts": {

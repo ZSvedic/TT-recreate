@@ -55,7 +55,8 @@ Then('the demo log shows {string}', async (text: string) => {
 });
 
 Then('the demo renders every icon name', async () => {
-  const names = await page.locator('[data-uk-icon]').evaluateAll(
+  // Scoped to the icon grid: other demo controls (the theme toggle) use icons too.
+  const names = await page.locator('#icons [data-uk-icon]').evaluateAll(
     (els) => els.map((el) => el.getAttribute('data-uk-icon') ?? ''));
   assert.ok(names.every((n) => n !== ''));
   assert.equal(new Set(names).size, ICON_COUNT);

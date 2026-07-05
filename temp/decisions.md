@@ -98,3 +98,31 @@
   `app/`, demos under `demos/<name>/`, static `tutorials/` + `samples/` +
   `cassettes/` at the root (the app fetches them relative to the site base,
   not the app dir).
+
+## Session 4 — design parity
+
+- **The shell composes the package `dom.ts` components** (`toolbar`,
+  `table-view`, `chat-panel`, `model-config`, ui-kit toasts): `app.ts` keeps
+  only layout, wiring, and overlays. Theme = `applyTheme` (ui-kit `--uk-*`
+  vars + `data-uk-mode` on `<body>`) plus a `paintTheme()` that copies the
+  active Theme onto the root as each package's namespaced variables
+  (`--tb-*`, `--tv-*`, `--cp-*`, `--mc-*`), per spec/packages/README.md.
+  Mode persists under `localStorage["tamedtable.theme"]`.
+- **Toast kinds are classified in the shell.** `WebController.toasts` stays
+  `string[]` (the tested surface); the shell maps each drained message to the
+  ui-kit `{id, kind, message}` shape, guessing `error` by wording
+  (error/failed/invalid/could not/require…). Auto-fade + hover-pause come
+  from ui-kit `mountToasts`.
+- **Settings = model-config's accordion as-is.** Its model rows are read-only
+  (Primary/Secondary readouts), so the shell no longer offers per-model
+  switching — provider cards select the provider's defaults; keys are
+  editable. `setModel` stays on the controller (used by tests/deep links).
+- **Toolbar condenses below 1100 px** (icon-only buttons, readout hidden) —
+  behavior.md names the band but no px; 768 px stays the phone breakpoint.
+- **ui-kit grew `createThemeToggle`** (sun/moon, `data-uk-theme-toggle`);
+  the demo's icon-count step now counts inside `#icons` only, since other
+  demo controls legitimately use icons.
+- **Live mic = `browserVoicePort()`** — a `VoicePort` over MediaRecorder
+  behind a `navigator.mediaDevices`/`MediaRecorder` feature-detect; the mic
+  button renders only when `controller.micVisible()` (voice-capable model +
+  key). Voice tours keep replaying from clips, never touching the port.

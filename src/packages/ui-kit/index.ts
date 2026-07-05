@@ -8,6 +8,8 @@ export const BRAND = {
   line: tokens.brand.line,
 } as const;
 
+export const typography = tokens.typography;
+
 export type Theme = Record<string, string>;
 export const lightTheme: Theme = tokens.themes.light as Theme;
 export const darkTheme: Theme = tokens.themes.dark as Theme;
