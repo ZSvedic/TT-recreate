@@ -167,6 +167,10 @@ const app = document.getElementById('app')!;
 let toursOpen = false;
 let busy = false;
 const CONDENSE_BELOW = 1100; // px: below this the toolbar drops labels for icons
+const PHONE_BELOW = 768; // px: at or below this the dock layout takes over (behavior.md)
+const isMobile = (): boolean => window.innerWidth <= PHONE_BELOW;
+type MobileSheet = 'none' | 'menu' | 'type' | 'speak' | 'history';
+let mobileSheet: MobileSheet = 'none';
 
 /** Wrap a handler: run, toast errors, re-render. */
 const act = (fn: () => void | Promise<void>) => async () => {
@@ -254,7 +258,7 @@ function promptDialog(title: string, initial: string, onOk: (value: string) => u
 /** Right-hand overlay sheet (Settings / Tours share it, like the prototype). */
 function sheet(title: string, onClose: () => void): { wrap: HTMLElement; body: HTMLElement } {
   const wrap = overlay(onClose, 'flex-end');
-  const panel = el('div', 'width:400px;max-width:92%;height:100%;background:var(--uk-surface);' +
+  const panel = el('div', `width:${isMobile() ? '100%' : '400px'};max-width:${isMobile() ? '100%' : '92%'};height:100%;background:var(--uk-surface);` +
     'border-left:1px solid var(--uk-line2);box-shadow:var(--uk-shadowLg);display:flex;flex-direction:column');
   panel.className = 'uk-sheet';
   const head = el('div', 'height:40px;flex:0 0 auto;display:flex;align-items:center;padding:0 14px;' +
@@ -440,12 +444,268 @@ function renderChat(target: HTMLElement): void {
   });
 }
 
+
+// ---------- mobile dock layout (behavior.md "Narrow viewport") ----------
+
+const relTime = (ts: number, now: number): string => {
+  const sec = Math.max(0, Math.round((now - ts) / 1000));
+  if (sec < 8) return 'now';
+  if (sec < 60) return `${sec}s`;
+  return `${Math.round(sec / 60)}m`;
+};
+
+function dockButton(key: string, label: string, iconSvg: string, disabled: boolean, onClick: () => void): HTMLElement {
+  const b = el('button', 'flex:0 0 auto;display:flex;flex-direction:column;align-items:center;' +
+    'justify-content:center;gap:3px;width:58px;height:66px;border:none;background:transparent;' +
+    'color:var(--uk-dockInk);cursor:pointer;font-family:inherit' +
+    (disabled ? ';opacity:0.34;cursor:default' : ''));
+  b.setAttribute('data-dock', key);
+  (b as HTMLButtonElement).disabled = disabled;
+  b.title = label;
+  b.innerHTML = iconSvg;
+  b.appendChild(el('span', 'font-size:9.5px;font-weight:600;letter-spacing:0.2px;line-height:1', label));
+  b.addEventListener('click', () => { if (!disabled) onClick(); });
+  return b;
+}
+
+const dockIcon = (path: string): string =>
+  '<svg viewBox="0 0 16 16" width="26" height="26" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"><path d="' + path + '"/></svg>';
+const DOCK_ICONS = {
+  menu: 'M2.5 4.5h11 M2.5 8h11 M2.5 11.5h11',
+  undo: 'M5 5 2.5 7.5 5 10 M2.5 7.5h7.5a3.5 3.5 0 1 1 0 7H7',
+  clock: 'M8 2.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Z M8 5.3V8l2 1.3',
+  kb: 'M2 4.75h12A1.25 1.25 0 0 1 15.25 6v4A1.25 1.25 0 0 1 14 11.25H2A1.25 1.25 0 0 1 .75 10V6A1.25 1.25 0 0 1 2 4.75Z M3.4 7.4h.01 M5.7 7.4h.01 M8 7.4h.01 M10.3 7.4h.01 M12.6 7.4h.01 M5.2 9.6h5.6',
+  mic: 'M8 2.5a2 2 0 0 1 2 2v3.5a2 2 0 0 1-4 0V4.5a2 2 0 0 1 2-2Z M4.5 8a3.5 3.5 0 0 0 7 0 M8 11.5V14 M6 14h4',
+};
+
+/** Bottom sheet frame that takes the dock's place; the table stays above it. */
+function mobileSheetFrame(title: string): { frame: HTMLElement; body: HTMLElement } {
+  const frame = el('div', 'flex:0 0 auto;height:300px;display:flex;flex-direction:column;' +
+    'background:var(--uk-surface);border-top:1px solid var(--uk-line)');
+  frame.className = 'uk-sheet';
+  frame.setAttribute('data-mobile-sheet', title.toLowerCase());
+  const head = el('div', 'display:flex;align-items:center;gap:8px;padding:10px 10px 9px;' +
+    'border-bottom:1px solid var(--uk-line)');
+  const close = btn('▾', 'width:36px;height:36px;flex:0 0 auto;border-radius:10px;' +
+    'border:1px solid var(--uk-line2);background:transparent;color:var(--uk-ink3);cursor:pointer;font:inherit',
+    () => { mobileSheet = 'none'; render(); }, { 'data-sheet-lower': '' });
+  close.title = 'Lower this sheet';
+  head.appendChild(close);
+  head.appendChild(el('span', 'font-size:11.5px;font-weight:700;letter-spacing:0.7px;' +
+    'text-transform:uppercase;color:var(--uk-ink3)', title));
+  const gap = el('span', 'flex:1');
+  head.appendChild(gap);
+  frame.appendChild(head);
+  const body = el('div', 'flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column');
+  frame.appendChild(body);
+  return { frame, body };
+}
+
+function renderHistorySheet(): HTMLElement {
+  const { frame, body } = mobileSheetFrame('History');
+  const head = frame.firstChild as HTMLElement;
+  const navBtn = (label: string, enabled: boolean, onClick: () => void, attr: string): HTMLElement => {
+    const b = btn(label, 'height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--uk-line2);' +
+      'background:transparent;font-size:12.5px;font-weight:500;font-family:inherit;' +
+      `color:var(--uk-${enabled ? 'ink2' : 'ink4'});cursor:${enabled ? 'pointer' : 'default'}`,
+      () => { if (enabled) onClick(); }, { [attr]: '' });
+    (b as HTMLButtonElement).disabled = !enabled;
+    return b;
+  };
+  head.appendChild(navBtn('Undo', controller.canUndo(), act(() => controller.undo()) as unknown as () => void, 'data-history-undo'));
+  head.appendChild(navBtn('Redo', controller.canRedo(), act(() => controller.redo()) as unknown as () => void, 'data-history-redo'));
+
+  const labels = controller.historyLabels();
+  const times = controller.historyTimes();
+  const cursor = controller.historyCursor();
+  const now = Date.now();
+  for (let i = labels.length - 1; i >= 0; i--) {
+    const state = i > cursor ? 'undone' : i === cursor ? 'cur' : 'done';
+    const row = el('button', 'display:flex;align-items:center;gap:12px;width:100%;padding:11px 18px;' +
+      'border:0;border-bottom:1px solid var(--uk-line);text-align:left;cursor:pointer;font-family:inherit;' +
+      `font-size:12.5px;font-weight:${state === 'cur' ? 600 : 400};` +
+      `background:${state === 'cur' ? 'var(--uk-accentSoft)' : 'transparent'};` +
+      `color:var(--uk-${state === 'undone' ? 'ink4' : 'ink'})`);
+    row.setAttribute('data-history-entry', String(i));
+    const knob = el('span', 'width:11px;height:11px;border-radius:50%;flex:0 0 auto;' +
+      `border:1.5px ${state === 'undone' ? 'dashed' : 'solid'} var(--uk-${state === 'cur' ? 'accent' : 'ink4'});` +
+      `background:${state === 'cur' ? 'var(--uk-accent)' : 'transparent'}`);
+    row.appendChild(knob);
+    row.appendChild(el('span', 'flex:1', labels[i]!));
+    row.appendChild(el('span', `font-family:${typography.mono};font-size:10.5px;color:var(--uk-ink4)`,
+      relTime(times[i]!, now)));
+    row.addEventListener('click', () => void act(() => controller.jumpTo(i))());
+    body.appendChild(row);
+  }
+  return frame;
+}
+
+function renderTypeSheet(): HTMLElement {
+  const { frame, body } = mobileSheetFrame('Type a request');
+  body.style.cssText += ';padding:12px;gap:10px';
+  const row = el('div', 'display:flex;gap:8px;align-items:center');
+  const input = document.createElement('input');
+  input.setAttribute('data-mobile-input', '');
+  input.type = 'text';
+  input.placeholder = 'Describe a transformation…';
+  input.value = controller.tutorialPrefill;
+  input.style.cssText = 'flex:1;padding:10px;border:1px solid var(--uk-line2);border-radius:6px;' +
+    'background:var(--uk-surface2);color:var(--uk-ink);font-family:inherit;font-size:13px;outline:none';
+  const send = () => {
+    const text = input.value.trim();
+    if (!text) return;
+    mobileSheet = 'none';
+    void act(() => controller.sendChat(text))();
+  };
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+  row.appendChild(input);
+  row.appendChild(btn('Send', BTN_PRIMARY + 'height:38px', send, { 'data-mobile-send': '' }));
+  body.appendChild(row);
+  const chips = el('div', 'display:flex;flex-wrap:wrap;gap:6px');
+  for (const text of ['normalize phone numbers', 'drop duplicate emails', 'add a Country column from Phone']) {
+    chips.appendChild(btn(text, 'padding:6px 10px;border-radius:14px;border:1px solid var(--uk-line2);' +
+      'background:var(--uk-surface2);color:var(--uk-ink2);font-size:11.5px;font-family:inherit;cursor:pointer',
+      () => { input.value = text; input.focus(); }));
+  }
+  body.appendChild(chips);
+  return frame;
+}
+
+function renderSpeakSheet(): HTMLElement {
+  const { frame, body } = mobileSheetFrame('Speak');
+  body.style.cssText += ';align-items:center;justify-content:center;gap:12px';
+  if (!controller.micVisible()) {
+    body.appendChild(el('p', 'margin:0;padding:0 24px;text-align:center;font-size:12.5px;' +
+      'color:var(--uk-ink3);line-height:1.6',
+      'Voice input needs a voice-capable model and an API key — open Menu → Settings to add one.'));
+    return frame;
+  }
+  const slot = el('span');
+  mountMicButton(slot, {
+    status: controller.voiceStatus,
+    onStart: () => void act(() => controller.startVoice())(),
+    onLatch: () => { controller.latchVoice(); render(); },
+    onStop: () => void act(async () => { await controller.stopVoice(); mobileSheet = 'none'; })(),
+    onCancel: () => { controller.cancelVoice(); render(); },
+  });
+  body.appendChild(slot);
+  body.appendChild(el('span', 'font-size:11.5px;color:var(--uk-ink4)',
+    'Hold to record · release to send · tap to latch'));
+  return frame;
+}
+
+function renderMenuDrawer(): HTMLElement {
+  const wrap = overlay(() => { mobileSheet = 'none'; render(); }, 'center');
+  wrap.style.justifyContent = 'flex-start';
+  const panel = el('div', 'width:280px;max-width:86%;height:100%;background:var(--uk-surface);' +
+    'border-right:1px solid var(--uk-line2);box-shadow:var(--uk-shadowLg);display:flex;' +
+    'flex-direction:column;padding:10px 0;overflow-y:auto');
+  panel.className = 'uk-sheet';
+  panel.setAttribute('data-mobile-menu', '');
+  const item = (label: string, onClick: () => void, disabled = false): HTMLElement => {
+    const b = btn(label, 'display:flex;align-items:center;width:100%;padding:12px 18px;border:0;' +
+      'background:transparent;text-align:left;font-family:inherit;font-size:13px;cursor:pointer;' +
+      `color:var(--uk-${disabled ? 'ink4' : 'ink'})`,
+      () => { if (disabled) return; mobileSheet = 'none'; onClick(); });
+    (b as HTMLButtonElement).disabled = disabled;
+    panel.appendChild(b);
+    return b;
+  };
+  const rule = () => panel.appendChild(el('div', 'height:1px;background:var(--uk-line);margin:8px 0'));
+  const loaded = controller.hasTableLoaded();
+  item('Open sample…', () => void act(() => controller.openSamplePicker())());
+  item('Open local…', () => openLocalFile());
+  item('Open URL…', () => void act(() => controller.openUrlDialog())());
+  rule();
+  item('Save data', () => void act(() => controller.say('save data'))(), !loaded);
+  item('Save as CSV…', () => void act(() => controller.say('save as csv'))(), !loaded);
+  item('Save as JSONL…', () => void act(() => controller.say('save as jsonl'))(), !loaded);
+  item('Save flow', () => void act(() => controller.say('save flow'))(), !loaded);
+  item('Save as Python…', () => void act(() => controller.say('save as python'))(), !loaded);
+  rule();
+  item(mode === 'dark' ? 'Light theme' : 'Dark theme', () => toggleTheme());
+  item('Settings', () => void act(() => controller.openSettings())());
+  item('Tours', () => void act(() => { toursOpen = true; controller.openTutorial(); })());
+  wrap.appendChild(panel);
+  return wrap;
+}
+
+function renderMobile(): void {
+  const loaded = controller.hasTableLoaded();
+
+  // App bar: brand mark, file name, page/total pager.
+  const bar = el('div', 'height:40px;flex:0 0 auto;display:flex;align-items:center;gap:10px;' +
+    'padding:0 12px;background:var(--uk-surface);border-bottom:1px solid var(--uk-line)');
+  bar.setAttribute('data-appbar', '');
+  const brand = el('span', 'display:inline-flex;align-items:center;gap:5px');
+  brand.innerHTML = '<svg viewBox="0 0 900 500" width="18" height="10" shape-rendering="crispEdges">' +
+    ['iiiiaiiii', '.i.....i.', '.i.iii.i.', '.i.....i.', '.i.iii.i.'].map((row, r) =>
+      row.split('').map((v, c) => v === '.' ? '' :
+        `<rect x="${c * 100}" y="${r * 100}" width="100" height="100" fill="var(--uk-${v === 'a' ? 'accent' : 'ink'})"/>`,
+      ).join('')).join('') + '</svg>';
+  bar.appendChild(brand);
+  bar.appendChild(el('span', `font-family:${typography.mono};font-size:12.5px;color:var(--uk-ink3);` +
+    'white-space:nowrap;overflow:hidden;text-overflow:ellipsis',
+    loaded ? basename(String(controller.engine().currentSpec().table ?? '')) : 'TamedTable'));
+  bar.appendChild(el('span', 'flex:1'));
+  if (loaded && controller.pageCount() > 1) {
+    const pager = el('span', 'display:inline-flex;align-items:center;gap:6px;' +
+      `font-family:${typography.mono};font-size:12.5px;color:var(--uk-ink2)`);
+    pager.appendChild(btn('‹', 'border:0;background:transparent;color:var(--uk-ink2);cursor:pointer;font:inherit;padding:4px',
+      () => { controller.goToPage(controller.currentPage() - 1); render(); }));
+    pager.appendChild(el('span', '', `${controller.currentPage()} / ${controller.pageCount()}`));
+    pager.appendChild(btn('›', 'border:0;background:transparent;color:var(--uk-ink2);cursor:pointer;font:inherit;padding:4px',
+      () => { controller.goToPage(controller.currentPage() + 1); render(); }));
+    bar.appendChild(pager);
+  }
+  app.appendChild(bar);
+
+  if (controller.isTutorialActive() || controller.isTutorialDone()) app.appendChild(renderTourBar());
+
+  // Table (or the empty pane) fills the middle.
+  const main = el('div', 'flex:1;display:flex;flex-direction:column;min-height:0');
+  renderTable(main);
+  app.appendChild(main);
+
+  // Bottom: a raised sheet takes the dock's place; otherwise the dock.
+  if (mobileSheet === 'history') app.appendChild(renderHistorySheet());
+  else if (mobileSheet === 'type') app.appendChild(renderTypeSheet());
+  else if (mobileSheet === 'speak') app.appendChild(renderSpeakSheet());
+  else {
+    const dock = el('div', 'flex:0 0 auto;height:80px;display:flex;align-items:center;' +
+      'justify-content:space-around;background:var(--uk-dockBg);color:var(--uk-dockInk);' +
+      'border-top:1px solid var(--uk-dockBorder)');
+    dock.setAttribute('data-dock-bar', '');
+    dock.appendChild(dockButton('menu', 'Menu', dockIcon(DOCK_ICONS.menu), false,
+      () => { mobileSheet = 'menu'; render(); }));
+    dock.appendChild(dockButton('undo', 'Undo', dockIcon(DOCK_ICONS.undo), !controller.canUndo(),
+      () => void act(() => controller.undo())()));
+    dock.appendChild(dockButton('history', 'History', dockIcon(DOCK_ICONS.clock), !loaded,
+      () => { mobileSheet = 'history'; render(); }));
+    dock.appendChild(dockButton('type', 'Type', dockIcon(DOCK_ICONS.kb), !loaded,
+      () => { mobileSheet = 'type'; render(); }));
+    dock.appendChild(dockButton('speak', 'Speak', dockIcon(DOCK_ICONS.mic), !loaded,
+      () => { mobileSheet = 'speak'; render(); }));
+    app.appendChild(dock);
+  }
+  if (mobileSheet === 'menu') app.appendChild(renderMenuDrawer());
+}
+
 const dialogHost = el('div');
 
 function render(): void {
   app.innerHTML = '';
   app.style.cssText = 'height:100vh;display:flex;flex-direction:column;' +
     'overflow:hidden;background:var(--uk-bg);color:var(--uk-ink)';
+
+  if (isMobile()) {
+    renderMobile();
+    renderDialogLayer();
+    app.appendChild(toastHost);
+    renderToasts();
+    return;
+  }
 
   // Toolbar (package component).
   const toolbarHost = el('div', 'flex:0 0 auto');
@@ -456,8 +716,8 @@ function render(): void {
     fileName: controller.hasTableLoaded() ? basename(String(controller.engine().currentSpec().table ?? '')) : '',
     rowCount: controller.totalRows(),
     colCount: controller.columnIds().length,
-    canUndo: controller.hasTableLoaded(),
-    canRedo: false,
+    canUndo: controller.canUndo(),
+    canRedo: controller.canRedo(),
     condensed: window.innerWidth < CONDENSE_BELOW,
     dark: mode === 'dark',
     onOpenSample: () => void act(() => controller.openSamplePicker())(),
@@ -466,7 +726,7 @@ function render(): void {
     onSaveData: () => void act(() => controller.say('save data'))(),
     onSaveFlow: () => void act(() => controller.say('save flow'))(),
     onUndo: () => void act(() => controller.undo())(),
-    onRedo: () => { /* redo lands with the history timeline */ },
+    onRedo: () => void act(() => controller.redo())(),
     onToggleTheme: () => toggleTheme(),
     onOpenSettings: () => void act(() => controller.openSettings())(),
     onOpenTutorial: () => void act(() => { toursOpen = true; controller.openTutorial(); })(),
@@ -486,7 +746,14 @@ function render(): void {
   renderTable(main);
   app.appendChild(main);
 
-  // Dialog layer: package dialogs + shell prompt dialogs + sheets.
+  renderDialogLayer();
+
+  app.appendChild(toastHost);
+  renderToasts();
+}
+
+/** Package dialogs + shell prompt dialogs + sheets (desktop and mobile share it). */
+function renderDialogLayer(): void {
   dialogHost.innerHTML = '';
   app.appendChild(dialogHost);
   if (controller.settingsOpen) dialogHost.appendChild(renderSettings());
@@ -517,9 +784,6 @@ function render(): void {
     dialogHost.appendChild(promptDialog('Save as', controller.suggestedSaveName,
       (name) => void act(() => controller.confirmSave(name))()));
   }
-
-  app.appendChild(toastHost);
-  renderToasts();
 }
 
 let resizeTimer = 0;

@@ -126,3 +126,17 @@
   behind a `navigator.mediaDevices`/`MediaRecorder` feature-detect; the mic
   button renders only when `controller.micVisible()` (voice-capable model +
   key). Voice tours keep replaying from clips, never touching the port.
+- **Undo timeline is a cursor journal.** `WebController` keeps
+  `history[0] = "Loaded <file>"` plus one entry per successful change (chat
+  turn labelled by its text, voice by the transcript bubble, `edit <col>`,
+  `move <col> first`), each a full-spec snapshot with a timestamp;
+  `undo`/`redo` move the cursor, `jumpTo(i)` jumps, a new change truncates
+  the redone tail (pinned by new web.feature scenarios).
+- **Mobile dock layout** (≤768 px, per behavior.md): app bar (mark, file,
+  `‹ page/total ›`), table, and the five-button dock (`data-dock=…`) on the
+  `dockBg/dockInk` tokens. Type/Speak/History raise 300-px bottom sheets in
+  the dock's place; Menu opens a left drawer; Settings/Tours/dialog sheets go
+  full-width. The desktop pagination/status footers stay under the table on
+  mobile (the spec's page-scrolls-the-table + frozen header/index refinement
+  is not implemented); tour steps show in the tour bar, not a Type-sheet
+  spotlight — logged as remaining.

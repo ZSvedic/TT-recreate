@@ -81,7 +81,7 @@ const baseName = (p: string): string => p.split('/').filter(Boolean).pop() ?? p;
 const stem = (p: string): string => baseName(p).replace(/\.[^.]+$/, '');
 const EXT: Record<string, string> = { csv: '.csv', jsonl: '.jsonl', parquet: '.parquet', arrow: '.arrow' };
 
-interface JournalTurn { label: string; before: TablePlan }
+interface JournalTurn { label: string; spec: TablePlan; time: number }
 interface PendingSave { kind: 'data' | 'data-as' | 'flow' | 'python'; format?: FormatId; script?: string }
 
 export class WebController {
@@ -128,7 +128,10 @@ export class WebController {
   private loadedPath: string | null = null;
   private page = 1;
   private activity: 'idle' | 'running' | 'saved' = 'idle';
-  private journal: JournalTurn[] = [];
+  // Undo timeline: history[0] is the loaded baseline, cursor points at the
+  // current state; undo/redo walk it, a new change truncates the redone tail.
+  private history: JournalTurn[] = [];
+  private cursor = -1;
   private pendingSave: PendingSave | null = null;
   private fetchOverride: FetchLike | null = null;
   private voicePort: VoicePort | null;
@@ -220,7 +223,8 @@ export class WebController {
       if (prevSpec && prevSpec.transformations.length > 0) await this.engineInstance.setSpec(prevSpec);
     } else if (!preserveTable) {
       this.loadedPath = null;
-      this.journal = [];
+      this.history = [];
+      this.cursor = -1;
       this.page = 1;
       this.selection = null;
     }
@@ -316,6 +320,7 @@ export class WebController {
     try {
       await this.engine().request(text);
       this.messages.push({ role: 'assistant', text: this.assistantText() });
+      this.recordTurn(text);
       this.clampPageIntoRange();
     } catch (e) {
       const friendly = this.mapProviderError((e as Error).message);
@@ -332,7 +337,8 @@ export class WebController {
     const path = this.opts.resolveFixturePath ? this.opts.resolveFixturePath(name) : name;
     await this.engine().loadInput(path);
     this.loadedPath = path;
-    this.journal = [];
+    this.history = [{ label: `Loaded ${baseName(name)}`, spec: structuredClone(this.engine().currentSpec()), time: Date.now() }];
+    this.cursor = 0;
     this.page = 1;
     this.selection = null;
     this.activity = 'idle';
@@ -433,33 +439,57 @@ export class WebController {
 
   async editCell(row1: number, column: string, value: string): Promise<void> {
     const spec = this.engine().currentSpec();
-    const before = structuredClone(spec);
     const t: Transformation = {
       kind: 'mutate', columns: column,
       value: { js: `i === ${row1 - 1} ? ${JSON.stringify(value)} : row[${JSON.stringify(column)}]` },
     } as Transformation;
     await this.engine().setSpec({ ...spec, transformations: [...spec.transformations, t] });
-    this.journal.push({ label: `edit ${column}`, before });
+    this.recordTurn(`edit ${column}`);
     this.activity = 'idle';
   }
 
   async reorderColumnFirst(column: string): Promise<void> {
     const spec = this.engine().currentSpec();
-    const before = structuredClone(spec);
     const cols = [...spec.columns];
     const i = cols.findIndex((c) => c.id === column);
     if (i < 0) throw new Error(`no column ${column}`);
     const [moved] = cols.splice(i, 1);
     cols.unshift(moved!);
     await this.engine().setSpec({ ...spec, columns: cols });
-    this.journal.push({ label: `move ${column} first`, before });
+    this.recordTurn(`move ${column} first`);
     this.activity = 'idle';
   }
 
+  // ---------- undo timeline (#History) ----------
+
+  /** Records the state after a successful change, truncating any redone tail. */
+  private recordTurn(label: string): void {
+    const spec = this.tryModify((s) => structuredClone(s));
+    if (!spec) return;
+    this.history = this.history.slice(0, this.cursor + 1);
+    this.history.push({ label, spec, time: Date.now() });
+    this.cursor = this.history.length - 1;
+  }
+
+  historyLabels(): string[] { return this.history.map((t) => t.label); }
+  historyTimes(): number[] { return this.history.map((t) => t.time); }
+  historyCursor(): number { return this.cursor; }
+  canUndo(): boolean { return this.cursor > 0; }
+  canRedo(): boolean { return this.cursor >= 0 && this.cursor < this.history.length - 1; }
+
+  async jumpTo(index: number): Promise<void> {
+    if (index < 0 || index >= this.history.length || index === this.cursor) return;
+    this.cursor = index;
+    await this.engine().setSpec(structuredClone(this.history[index]!.spec));
+    this.clampPageIntoRange();
+  }
+
   async undo(): Promise<void> {
-    const turn = this.journal.pop();
-    if (!turn) return;
-    await this.engine().setSpec(turn.before);
+    if (this.canUndo()) await this.jumpTo(this.cursor - 1);
+  }
+
+  async redo(): Promise<void> {
+    if (this.canRedo()) await this.jumpTo(this.cursor + 1);
   }
 
   // ---------- voice ----------
@@ -520,6 +550,7 @@ export class WebController {
         onTranscript: (t) => { bubble.text = `🎙 ${t}`; },
       });
       this.messages.push({ role: 'assistant', text: this.assistantText() });
+      this.recordTurn(bubble.text);
     } catch (e) {
       const friendly = `Voice input failed: ${this.mapProviderError((e as Error).message)}`;
       this.pushToast(friendly);

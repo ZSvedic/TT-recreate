@@ -228,6 +228,19 @@ Then('cell at row {int} column {string} shows the original value', function (thi
   assert.equal(ctl(this).cellValue(row, col), this.sourceSnapshot[row - 1]![col]);
 });
 When('user undoes the last change', async function (this: TTWorld) { await ctl(this).undo(); });
+When('user redoes the last change', async function (this: TTWorld) { await ctl(this).redo(); });
+When('user jumps to history entry {int}', async function (this: TTWorld, i: number) {
+  await ctl(this).jumpTo(i);
+});
+Then('the history timeline shows {int} entries', function (this: TTWorld, n: number) {
+  assert.equal(ctl(this).historyLabels().length, n);
+});
+Then('the history cursor is at entry {int}', function (this: TTWorld, i: number) {
+  assert.equal(ctl(this).historyCursor(), i);
+});
+Then('history entry {int} is labelled {string}', function (this: TTWorld, i: number, label: string) {
+  assert.equal(ctl(this).historyLabels()[i], label);
+});
 When('user reorders columns so {string} comes first', async function (this: TTWorld, col: string) {
   await ctl(this).reorderColumnFirst(col);
 });
