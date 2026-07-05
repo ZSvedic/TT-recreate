@@ -3,7 +3,7 @@
 // buttons, and the theme toggle. Every interaction appends to the #out log.
 import { darkTheme, lightTheme } from './index';
 import {
-  applyTheme, createButton, createIcon, createSplitButton, mountToasts,
+  applyTheme, createButton, createIcon, createSplitButton, createThemeToggle, mountToasts,
   type ButtonVariant, type Mode, type Toast, type ToastKind,
 } from './dom';
 import { ICON_NAMES } from './icons';
@@ -65,9 +65,16 @@ controls.appendChild(Object.assign(
 controls.appendChild(Object.assign(
   createButton({ label: 'Add error toast', variant: 'chrome', onClick: () => addToast('error', 'Query failed: table not found.') }),
   { id: 'add-error' }));
-controls.appendChild(Object.assign(
-  createButton({ label: 'Toggle theme', variant: 'chrome', onClick: () => setMode(mode === 'light' ? 'dark' : 'light') }),
-  { id: 'theme-toggle' }));
+const toggleSlot = Object.assign(document.createElement('span'), { id: 'theme-toggle' });
+controls.appendChild(toggleSlot);
+function renderToggle(): void {
+  toggleSlot.innerHTML = '';
+  toggleSlot.appendChild(createThemeToggle({
+    mode,
+    onToggle: () => { setMode(mode === 'light' ? 'dark' : 'light'); renderToggle(); },
+  }));
+}
+renderToggle();
 
 applyTheme(app, mode, lightTheme);
 log('ready');
