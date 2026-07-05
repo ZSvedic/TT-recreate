@@ -10,6 +10,7 @@
     "test:cli": "bun tests/run-cucumber.ts cli",
     "test:web": "bun tests/run-cucumber.ts web",
     "test:web:app": "TAMEDTABLE_SCOPE=app bun tests/run-cucumber.ts web",
+    "test:smoke": "bun tests/smoke.ts",
     "test:record": "TAMEDTABLE_CASSETTE=record bun tests/run-cucumber.ts headless && TAMEDTABLE_CASSETTE=record bun tests/run-cucumber.ts cli",
     "typecheck": "tsc --noEmit"
   },
