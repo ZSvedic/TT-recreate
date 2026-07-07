@@ -105,6 +105,30 @@ Feature: Browser shell
       And the browser user types the URL "http://example.com/data.csv"
       Then the URL dialog shows an unencrypted hint
 
+  Rule: SQL, parquet and arrow run in the browser
+
+    @web
+    Scenario: A SQL request replays through DuckDB in the browser
+      Given the built web app in a browser
+      When the app opens the deep link "?feature=sql.feature&scenario=SQL+scalar+fills+a+new+column"
+      And the user clicks the tour Next button
+      And the user clicks the tour Next button
+      Then the browser table shows the column "AgeYears"
+
+    @web
+    Scenario: A parquet sample loads and round-trips in the browser
+      Given the built web app in a browser
+      When the browser user opens the sample "customers-input.parquet"
+      Then the browser table shows the column "Country"
+      When the browser user saves the data as "out.parquet"
+      Then a download named "out.parquet" is delivered
+
+    @web
+    Scenario: An arrow sample loads in the browser
+      Given the built web app in a browser
+      When the browser user opens the sample "customers-input.arrow"
+      Then the browser table shows the column "Country"
+
   Rule: Hands-free voice has a shell toggle
 
     @web

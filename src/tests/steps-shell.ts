@@ -272,6 +272,23 @@ Then('no browser toast is shown', async () => {
   assert.equal(await page.locator('[data-uk-toast]').count(), 0);
 });
 
+Then('the browser table shows the column {string}', async (col: string) => {
+  await page.waitForSelector(`[data-tv-header="${col}"]`, { timeout: 30_000 });
+});
+
+When('the browser user saves the data as {string}', async (name: string) => {
+  await page.click('[data-tb-action="Save data"]');
+  await page.fill('[data-dialog] input', name);
+  const download = page.waitForEvent('download', { timeout: 30_000 });
+  await page.click('[data-ok]');
+  (page as Page & { __download?: Promise<{ suggestedFilename(): string }> }).__download = download;
+});
+
+Then('a download named {string} is delivered', async (name: string) => {
+  const download = await (page as Page & { __download?: Promise<{ suggestedFilename(): string }> }).__download!;
+  assert.equal(download.suggestedFilename(), name);
+});
+
 When('the browser user enters the gemini key {string}', async (key: string) => {
   await page.click('[data-mc-card="gemini"] [data-mc-head]');
   await page.fill('[data-mc-key="gemini"]', key);

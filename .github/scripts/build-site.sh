@@ -42,7 +42,7 @@ cp -r src/packages/web/dist/. "$OUT/app/"
 
 # Static tour data: feature sources, fixtures + voice clips, replay cassettes.
 cp spec/test-cases/*.feature "$OUT/tutorials/"
-cp spec/test-cases/*.csv spec/test-cases/*.jsonl spec/test-cases/*.m4a "$OUT/samples/"
+cp spec/test-cases/*.csv spec/test-cases/*.jsonl spec/test-cases/*.parquet spec/test-cases/*.arrow spec/test-cases/*.m4a "$OUT/samples/"
 cp cassettes/*.json "$OUT/cassettes/"
 
 # Standalone module demos under /demos/<name>/.

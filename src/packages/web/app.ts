@@ -71,10 +71,7 @@ const controller = new WebController({
   env: {},
   fsAccess: false,
   saveDir: '/saves',
-  writeFile: (p, d) => {
-    memWrite(p, d);
-    if (p.startsWith('/saves/')) download(basename(p), memRead(p)!);
-  },
+  writeFile: (p, d) => memWrite(p, d),
   resolveFixturePath: (n) => `/samples/${basename(n)}`,
   voice: browserVoicePort() ?? undefined,
   continuousVoice: browserContinuousPort({ redemptionMs: 700, minSpeechMs: 300 }) ?? undefined,
@@ -935,7 +932,13 @@ function renderDialogLayer(): void {
   }
   if (controller.dialog === 'save') {
     dialogHost.appendChild(promptDialog('Save as', controller.suggestedSaveName,
-      (name) => void act(() => controller.confirmSave(name))()));
+      (name) => void act(async () => {
+        await controller.confirmSave(name);
+        // Every save lands in the in-memory fs; deliver it as a download.
+        const saved = controller.lastSavedPath;
+        const bytes = saved ? memRead(saved) : undefined;
+        if (saved && bytes) download(basename(saved), bytes);
+      })()));
   }
 }
 

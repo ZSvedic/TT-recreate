@@ -184,3 +184,18 @@
   (`encodeWavPcm16`, unit-tested) with a raw-blob fallback when decode fails.
 - **The 30 s auto-send cap is injectable** (`voiceSchedule` option) so the
   Gherkin scenario fires the timer on a fake clock.
+
+## Session 5 — browser DuckDB
+
+- **duckdb-wasm is pinned to 1.28.0** — the last line with the parquet
+  extension statically linked. 1.29+ autoloads `parquet.duckdb_extension.wasm`
+  from extensions.duckdb.org at runtime, which the CI/sandbox proxy blocks
+  (and would add a runtime CDN dependency for users). Module + workers are
+  self-hosted under `app/duckdb/`, resolved relative to the page.
+- **The browser DuckDB shim bridges the parquet codec's tmp files**: a
+  `read_parquet('<path>')` source is registered from the in-memory fs shim
+  into duckdb's virtual FS before the query; a `COPY … TO '<path>'` result is
+  copied back out after. The sync-XHR sample fallback now fetches bytes with
+  the x-user-defined charset trick so parquet/arrow samples arrive byte-exact.
+- **Every browser save delivers a download** from the in-memory fs after
+  `confirmSave` (one central hook — data, flow, and Python alike).
