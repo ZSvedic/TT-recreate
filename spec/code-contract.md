@@ -144,7 +144,7 @@ overwrites the file; the parent directory must already exist. The recovery
 budget is 3 turns; running out throws an error carrying a `debug` field —
 a `RequestDebugInfo` (see Headless).
 
-`Runner` is the surface step definitions drive ([common.steps.ts](../src/tests/common.steps.ts));
+`Runner` is the surface step definitions drive ([steps.ts](../src/tests/steps.ts));
 the CLI and headless packages both return Runners with the same method
 signatures, differing only in what each does under the hood.
 
