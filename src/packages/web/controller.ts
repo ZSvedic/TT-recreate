@@ -168,6 +168,13 @@ export class WebController {
     return this.engineInstance;
   }
 
+  /** The key a live request should carry right now (replay always uses a placeholder). */
+  private resolveApiKey(base: HeadlessRunnerOptions): string {
+    return this.replaying ? 'placeholder' : this.keys[this.provider] ?? base.apiKey ?? 'placeholder';
+  }
+
+  private builtApiKey: string | null = null;
+
   private buildEngine(): Engine {
     const base = this.opts.engineOptions?.() ?? {};
     const replay = this.replaying;
@@ -175,14 +182,24 @@ export class WebController {
       ? this.opts.replayFetchFor?.(this.selectedTour.feature.replace(/\.feature$/, ''))
       : undefined;
     const rawFetch: FetchLike = this.fetchOverride ?? replayBase ?? base.fetch ?? ((i, init) => fetch(i, init));
+    this.builtApiKey = this.resolveApiKey(base);
     return createHeadlessRunner({
       ...base,
       model: replay ? defaultModel('gemini') : this.model,
       cellModel: replay ? defaultCellModel('gemini') : this.cellModel,
-      apiKey: replay ? 'placeholder' : this.keys[this.provider] ?? base.apiKey ?? 'placeholder',
+      apiKey: this.builtApiKey,
       fetch: this.wrapFetch(rawFetch),
       onDebug: (d) => { this.lastDebug = d; base.onDebug?.(d); },
     });
+  }
+
+  /** A key typed in Settings after the engine was built must reach the very
+   *  next request — rebuild (table preserved) when the built key went stale. */
+  private async ensureEngineCurrent(): Promise<void> {
+    if (!this.engineInstance) return;
+    if (this.builtApiKey !== this.resolveApiKey(this.opts.engineOptions?.() ?? {})) {
+      await this.rebuildEngine();
+    }
   }
 
   private wrapFetch(base: FetchLike): FetchLike {
@@ -315,6 +332,7 @@ export class WebController {
 
   async sendChat(text: string): Promise<void> {
     if (!this.keyGuard('Text requests')) return;
+    await this.ensureEngineCurrent();
     this.messages.push({ role: 'user', text });
     this.activity = 'running';
     try {
@@ -374,6 +392,7 @@ export class WebController {
       this.pushToast('This flow contains AI cells and has no deterministic Python form — save it as a flow instead.');
       return;
     }
+    await this.ensureEngineCurrent();
     const script = await this.engine().exportPython();
     this.pendingSave = { kind: 'python', script };
     this.suggestedSaveName = `${stem(this.tableName())}.py`;
@@ -541,6 +560,7 @@ export class WebController {
         },
       } : {}),
     };
+    await this.ensureEngineCurrent();
     const bubble: ChatMessage = { role: 'user', text: '🎙 Voice request' };
     this.messages.push(bubble);
     this.activity = 'running';
