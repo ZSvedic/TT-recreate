@@ -8,9 +8,9 @@ import {
 } from '@tamedtable/model-config';
 import { parseTours, TourDriver, type TourScenario } from '@tamedtable/gherkin-tour';
 import { buildVoicePrompt, type VoiceContext } from '@tamedtable/voice-input';
-import { pageCountFor, clampPage, pageSlice, pageList } from '@tamedtable/table-view';
-import { sampleLabel } from '@tamedtable/toolbar';
-import { BRAND, lightTheme, darkTheme, toastDuration } from '@tamedtable/ui-kit';
+import { pageCountFor, clampPage, pageSlice, buildPageList } from '@tamedtable/table-view';
+import { sampleKind } from '@tamedtable/toolbar';
+import { brand, lightTheme, darkTheme, toastDurationMs } from '@tamedtable/ui-kit';
 import { TTWorld } from './world.ts';
 
 const nl = (s: string): string => s.replace(/\\n/g, '\n');
@@ -430,27 +430,27 @@ Then('clampPage {int} of {int} pages is {int}', function (this: TTWorld, page: n
 });
 
 Then('pageSlice of {int} rows at size {int} page {int} has {int} rows', function (this: TTWorld, rows: number, size: number, page: number, expected: number) {
-  assert.equal(pageSlice(Array.from({ length: rows }, (_v, i) => i), size, page).length, expected);
+  assert.equal(pageSlice(Array.from({ length: rows }, (_v, i) => i), page, size).length, expected);
 });
 
 Then('the page list for page {int} of {int} is {string}', function (this: TTWorld, page: number, total: number, expected: string) {
-  assert.equal(pageList(page, total).join(','), expected);
+  assert.equal(buildPageList(page, total).join(','), expected);
 });
 
 // ---------- toolbar ----------
 
 Then('a toolbar sample named {string} is labelled {string}', function (this: TTWorld, name: string, label: string) {
-  assert.equal(sampleLabel(name), label);
+  assert.equal(sampleKind(name), label);
 });
 
 // ---------- ui-kit ----------
 
 Then('a toast reading {string} stays on screen for {int} ms', function (this: TTWorld, msg: string, ms: number) {
-  assert.equal(toastDuration(msg), ms);
+  assert.equal(toastDurationMs(msg), ms);
 });
 
 Then('a toast reading a {int}-character message stays on screen for {int} ms', function (this: TTWorld, chars: number, ms: number) {
-  assert.equal(toastDuration('x'.repeat(chars)), ms);
+  assert.equal(toastDurationMs('x'.repeat(chars)), ms);
 });
 
 When('the light and dark themes are compared', function (this: TTWorld) {
@@ -465,9 +465,9 @@ Then('the themes differ in their values', function () {
   assert.ok(Object.keys(lightTheme).some((k) => lightTheme[k] !== darkTheme[k]));
 });
 
-Then('brand ink is {string}', function (this: TTWorld, hex: string) { assert.equal(BRAND.ink, hex); });
-Then('brand accent is {string}', function (this: TTWorld, hex: string) { assert.equal(BRAND.accent, hex); });
-Then('brand line is {string}', function (this: TTWorld, hex: string) { assert.equal(BRAND.line, hex); });
+Then('brand ink is {string}', function (this: TTWorld, hex: string) { assert.equal(brand.ink, hex); });
+Then('brand accent is {string}', function (this: TTWorld, hex: string) { assert.equal(brand.accent, hex); });
+Then('brand line is {string}', function (this: TTWorld, hex: string) { assert.equal(brand.line, hex); });
 
 function lightness(color: string): number {
   const ok = color.match(/oklch\(\s*([\d.]+)/);

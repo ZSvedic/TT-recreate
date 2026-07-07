@@ -272,6 +272,22 @@ Then('no browser toast is shown', async () => {
   assert.equal(await page.locator('[data-uk-toast]').count(), 0);
 });
 
+Then('the settings panel offers the diagnostics actions', async () => {
+  for (const sel of ['[data-diag-send]', '[data-diag-copy]', '[data-diag-clear]']) {
+    assert.equal(await page.locator(sel).count(), 1, `missing ${sel}`);
+  }
+});
+
+When('the browser user sends the chat message {string}', async (text: string) => {
+  await page.fill('[data-cp-input]', text);
+  await page.press('[data-cp-input]', 'Enter');
+});
+
+Then('the newest browser toast carries the action {string}', async (label: string) => {
+  await page.waitForSelector('[data-uk-toast]', { timeout: 10_000 });
+  assert.equal(await page.locator('[data-uk-toast-action]').last().textContent(), label);
+});
+
 Then('the URL dialog shows an unencrypted hint', async () => {
   const note = await page.textContent('[data-tb-url-note]');
   assert.ok(note && /unencrypted/i.test(note), `note was: ${note}`);

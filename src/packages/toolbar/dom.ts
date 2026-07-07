@@ -2,7 +2,7 @@
 // (open / save-data / save-flow), undo/redo, theme toggle, plus the URL-open
 // dialog and the sample picker. Props in, callbacks out; the host owns state.
 // Styling reads --tb-* custom properties (presentable light defaults).
-import { sampleLabel } from './index';
+import { sampleKind } from './index';
 
 export interface ToolbarMenuItem {
   label: string;
@@ -381,7 +381,7 @@ export function mountSampleDialog(container: HTMLElement, p: SampleDialogProps):
       'font-family:var(--tb-font-mono,monospace);font-size:12.5px;display:flex;align-items:center;gap:8px';
     const badge = document.createElement('span');
     badge.setAttribute('data-tb-sample-kind', '');
-    badge.textContent = sampleLabel(sample.name);
+    badge.textContent = sampleKind(sample.name);
     badge.style.cssText = 'font-family:var(--tb-font,system-ui,sans-serif);font-size:11.5px;' +
       'color:var(--tb-ink3,#6d6491);text-transform:uppercase;letter-spacing:0.5px;min-width:44px';
     row.appendChild(badge);

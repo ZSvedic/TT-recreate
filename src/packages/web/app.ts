@@ -154,13 +154,18 @@ function toastKind(message: string): ToastKind {
 function renderToasts(): void {
   // Drain controller-pushed toasts into the shell list (stable ids drive auto-fade).
   for (const text of controller.toasts.splice(0)) {
-    toastItems.push({ id: toastSeq++, kind: toastKind(text), message: text });
+    const kind = toastKind(text);
+    toastItems.push({
+      id: toastSeq++, kind, message: text,
+      // An error toast carries the diagnostics escape hatch (behavior.md #Diagnostics).
+      ...(kind === 'error' ? { action: { label: 'Copy report' } } : {}),
+    });
   }
   mountToasts(toastHost, toastItems, (id) => {
     const at = toastItems.findIndex((t) => t.id === id);
     if (at >= 0) toastItems.splice(at, 1);
     renderToasts();
-  });
+  }, () => void navigator.clipboard?.writeText(controller.diagnosticsReport()));
 }
 
 // ---------- rendering ----------
@@ -302,8 +307,27 @@ function renderSettings(): HTMLElement {
   const hint = el('p', 'margin:10px 0 0;font-size:11.5px;line-height:1.5;color:var(--uk-ink3)',
     'Bring your own key — it stays in this browser, never on a server.');
   body.appendChild(hint);
+  body.appendChild(renderDiagActions());
   if (isMobile()) body.appendChild(renderA2hs());
   return wrap;
+}
+
+/** Diagnostics actions (behavior.md #Diagnostics): bug report, copy, clear. */
+function renderDiagActions(): HTMLElement {
+  const sec = el('div', 'margin-top:20px;padding-top:14px;border-top:1px solid var(--uk-line)');
+  sec.appendChild(el('div', 'font-size:11.5px;font-weight:600;letter-spacing:0.6px;' +
+    'text-transform:uppercase;color:var(--uk-ink3);margin-bottom:8px', 'Diagnostics'));
+  const row = el('div', 'display:flex;flex-wrap:wrap;gap:8px');
+  row.appendChild(btn('Send a bug report', BTN_PRIMARY, () => {
+    void navigator.clipboard?.writeText(controller.diagnosticsReport());
+    window.open(controller.bugReportUrl(), '_blank', 'noreferrer');
+  }, { 'data-diag-send': '' }));
+  row.appendChild(btn('Copy diagnostics report', BTN_CHROME,
+    () => void navigator.clipboard?.writeText(controller.diagnosticsReport()), { 'data-diag-copy': '' }));
+  row.appendChild(btn('Clear diagnostics', BTN_CHROME,
+    () => { controller.clearDiagnostics(); }, { 'data-diag-clear': '' }));
+  sec.appendChild(row);
+  return sec;
 }
 
 // Add to home screen (phone Settings only, behavior.md #WebUI): the install

@@ -16,7 +16,7 @@ import { fetchTable, serializeFlow, type FormatId } from '@tamedtable/file-io';
 import { pageCountFor, clampPage, pageSlice } from '@tamedtable/table-view';
 import { parseTours, type TourScenario, type TourStep } from '@tamedtable/gherkin-tour';
 import { fingerprint } from '@tamedtable/cassette';
-import { DiagnosticsManager, MAX_BODY, type DiagEvent } from './diagnostics.ts';
+import { DiagnosticsManager, MAX_BODY, type DiagEvent } from './controller-diagnostics.ts';
 
 export type Engine = ReturnType<typeof createHeadlessRunner>;
 
@@ -485,7 +485,7 @@ export class WebController {
   currentPage(): number { return clampPage(this.page, this.pageCount()); }
   goToPage(page: number): void { this.page = clampPage(page, this.pageCount()); }
   private clampPageIntoRange(): void { this.page = clampPage(this.page, this.pageCount()); }
-  pageRows(): Row[] { return pageSlice(this.engine().currentRows(), this.pageSize, this.currentPage()); }
+  pageRows(): Row[] { return pageSlice(this.engine().currentRows(), this.currentPage(), this.pageSize); }
 
   columnIds(): string[] { return this.tryModify((s) => s.columns.map((c) => c.id)) ?? []; }
 

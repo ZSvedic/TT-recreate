@@ -2,7 +2,7 @@
 // editing, header drag-reorder, streaming banner, pager, and status footer.
 // Props in, callbacks out; the host owns rows and page state and re-renders.
 // Styling reads --tv-* custom properties (presentable light defaults).
-import { pageList } from './index';
+import { buildPageList } from './index';
 
 export type Row = Record<string, unknown>;
 
@@ -252,7 +252,7 @@ export function mountTableView(container: HTMLElement, p: TableViewProps): void 
   prev.style.cssText = PAGE_BTN + (prev.disabled ? ';color:var(--tv-ink4,#a9a2c4);cursor:default' : '');
   prev.addEventListener('click', () => p.onPageChange(p.page - 1));
   pager.appendChild(prev);
-  for (const item of pageList(p.page, p.pageCount)) {
+  for (const item of buildPageList(p.page, p.pageCount)) {
     if (item === '…') {
       const dots = document.createElement('span');
       dots.textContent = '…';

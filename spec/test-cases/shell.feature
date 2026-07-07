@@ -105,6 +105,21 @@ Feature: Browser shell
       And the browser user types the URL "http://example.com/data.csv"
       Then the URL dialog shows an unencrypted hint
 
+  Rule: Diagnostics actions live in Settings
+
+    @web
+    Scenario: Settings offers the three diagnostics actions
+      Given the built web app in a browser
+      When the browser user opens Settings from the toolbar
+      Then the settings panel offers the diagnostics actions
+
+    @web
+    Scenario: An error toast carries a Copy report action
+      Given the built web app in a browser
+      When the browser user opens the sample "customers-input.csv"
+      And the browser user sends the chat message "normalize phone numbers"
+      Then the newest browser toast carries the action "Copy report"
+
   Rule: Add to home screen lives in phone Settings only
 
     @web

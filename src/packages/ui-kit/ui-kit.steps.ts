@@ -87,6 +87,22 @@ When('the user adds an {string} toast', async (kind: string) => {
   await page.click(`#add-${kind}`);
 });
 
+When('the user adds a toast with a {string} action', async (_label: string) => {
+  await page.click('#add-action');
+});
+
+Then('the newest toast shows an action labelled {string}', async (label: string) => {
+  assert.equal(await page.locator('[data-uk-toast-action]').last().textContent(), label);
+});
+
+When("the user clicks the newest toast's action", async () => {
+  await page.locator('[data-uk-toast-action]').last().click();
+});
+
+Then('the demo log records the toast action', async () => {
+  assert.ok((await page.textContent('#out'))?.includes('toast action'));
+});
+
 Then('an {string} toast is visible', async (kind: string) => {
   assert.ok(await page.isVisible(`[data-uk-toast="${kind}"]`));
 });
