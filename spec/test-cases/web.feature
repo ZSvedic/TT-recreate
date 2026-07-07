@@ -128,6 +128,44 @@ Feature: Web front-end
       When user saves as "out.jsonl"
       Then the status footer reports "saved"
 
+  Rule: The chat records loads and carries request detail
+
+    @web
+    Scenario: Loading a file posts an assistant load note
+      Given the TamedTable web app
+      When user says "Load CSV file"
+      And user selects "customers-input.csv"
+      Then an assistant bubble shows "Loaded customers-input.csv — 20 rows, 6 columns."
+      And the history timeline shows 1 entry
+      And no toast is shown
+
+    @web
+    Scenario: The transformation count starts at zero and follows the spec
+      Given the TamedTable web app
+      And load "customers-input.csv"
+      Then the chat request count is 0
+      When user edits cell at row 1 column "Country" to "United States"
+      Then the chat request count is 1
+      When user undoes the last change
+      Then the chat request count is 0
+
+    @web
+    Scenario: A successful request's assistant reply carries request detail
+      Given the TamedTable web app
+      And load "customers-input.csv"
+      When user sends the chat message "Normalize phone numbers to E.164"
+      Then the last assistant message carries request detail
+      And the request detail names the model "gemini-3.5-flash"
+
+    @web
+    Scenario: A failed request's error reply carries request detail too
+      Given the TamedTable web app
+      And load "customers-input.csv"
+      And the LLM API returns a 401 unauthorized error
+      When user sends the chat message "Normalize phone numbers to E.164"
+      Then the last assistant message is an error
+      And the last assistant message carries request detail
+
   Rule: Samples have their own picker, separate from the URL dialog
 
     @web

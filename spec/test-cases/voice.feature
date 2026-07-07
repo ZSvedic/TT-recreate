@@ -89,7 +89,7 @@ Feature: Voice input
       When user presses and holds the mic button
       And user presses Escape to cancel the recording
       Then the mic status is "idle"
-      And no chat message is shown
+      And no user bubble is shown
       And the spec has 0 transformations
 
   Rule: A quick tap latches recording with explicit send and cancel controls
@@ -102,7 +102,7 @@ Feature: Voice input
       And the provider "gemini" has API key "AIza-example-key"
       When user taps the mic button
       Then the mic status is "latched"
-      And no chat message is shown
+      And no user bubble is shown
       When user sends the latched recording
       Then a user bubble shows "🎙 normalize DOB column"
       And an assistant bubble is shown
@@ -119,7 +119,7 @@ Feature: Voice input
       Then the mic status is "latched"
       When user presses Escape to cancel the recording
       Then the mic status is "idle"
-      And no chat message is shown
+      And no user bubble is shown
       And the spec has 0 transformations
 
   Rule: The waveform button mirrors the mic for voice-capable models

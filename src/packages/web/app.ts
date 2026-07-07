@@ -413,15 +413,35 @@ function renderTable(target: HTMLElement): void {
   });
 }
 
+/** RequestDebugInfo → the chat panel's structural detail subset. */
+function toChatDetail(d: NonNullable<WebController['lastDebug']>) {
+  return {
+    request: d.userRequest,
+    model: d.modelCalls.map((c) => (c.calls > 1 ? `${c.model} ×${c.calls}` : c.model)).join(', ') || undefined,
+    inputTokens: d.inputTokens,
+    outputTokens: d.outputTokens,
+    elapsedMs: d.elapsedMs,
+    turns: d.turns.map((t) => ({
+      summary: t.outcome,
+      ops: t.ops.map((op) => JSON.stringify(op)),
+    })),
+    cellSamples: d.cellSamples.flatMap((c) =>
+      c.samples.map((s) => `${c.column}: ${JSON.stringify(s.in)} → ${JSON.stringify(s.out)}`)),
+  };
+}
+
 function renderChat(target: HTMLElement): void {
   const side = el('div', 'width:340px;flex:0 0 auto;display:flex;flex-direction:column;min-height:0;' +
     'border-right:1px solid var(--uk-line)');
   side.setAttribute('data-chat', '');
   target.appendChild(side);
   mountChatPanel(side, {
-    messages: controller.messages.map((m, i) => ({ id: String(i + 1), role: m.role, text: m.text })),
+    messages: controller.messages.map((m, i) => ({
+      id: String(i + 1), role: m.role, text: m.text,
+      debug: m.debug ? toChatDetail(m.debug) : undefined,
+    })),
     streaming: busy,
-    requestCount: controller.messages.filter((m) => m.role === 'user').length,
+    requestCount: controller.requestCount(),
     prefill: controller.tutorialPrefill || null,
     onSend: (text) => void act(() => controller.sendChat(text))(),
     onCancel: () => { /* replay/batch cancel is not wired in the shell */ },
