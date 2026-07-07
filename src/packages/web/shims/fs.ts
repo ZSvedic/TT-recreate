@@ -17,12 +17,19 @@ function remoteUrlFor(path: string): string | null {
 }
 
 // Synchronous XHR — the engine reads files synchronously mid-transformation,
-// so a fetch cannot help; samples are small and same-origin.
-function fetchSync(url: string): string | null {
+// so a fetch cannot help; samples are small and same-origin. The
+// x-user-defined charset keeps binary formats (parquet, arrow) byte-exact:
+// each char code's low byte is the original byte.
+function fetchSync(url: string): Uint8Array | null {
   const xhr = new XMLHttpRequest();
   xhr.open('GET', url, false);
+  xhr.overrideMimeType('text/plain; charset=x-user-defined');
   try { xhr.send(); } catch { return null; }
-  return xhr.status >= 200 && xhr.status < 300 ? xhr.responseText : null;
+  if (xhr.status < 200 || xhr.status >= 300) return null;
+  const text = xhr.responseText;
+  const bytes = new Uint8Array(text.length);
+  for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i) & 0xff;
+  return bytes;
 }
 
 export function readFileSync(path: string, encoding?: string | { encoding?: string }): any {
@@ -31,9 +38,9 @@ export function readFileSync(path: string, encoding?: string | { encoding?: stri
   let data = files.get(p);
   if (!data) {
     const url = remoteUrlFor(p);
-    const text = url ? fetchSync(url) : null;
-    if (text === null) throw Object.assign(new Error(`ENOENT: no such file, open '${p}'`), { code: 'ENOENT' });
-    data = enc.encode(text);
+    const fetched = url ? fetchSync(url) : null;
+    if (fetched === null) throw Object.assign(new Error(`ENOENT: no such file, open '${p}'`), { code: 'ENOENT' });
+    data = fetched;
     files.set(p, data);
   }
   return encoding ? dec.decode(data) : data;

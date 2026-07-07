@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@cucumber/cucumber": "^12.2.0",
+    "@duckdb/duckdb-wasm": "1.28.0",
     "@duckdb/node-api": "1.4.1-r.2",
     "apache-arrow": "^21.0.0",
     "csv": "^6.4.1",
