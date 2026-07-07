@@ -2,7 +2,7 @@
 // editing, header drag-reorder, streaming banner, pager, and status footer.
 // Props in, callbacks out; the host owns rows and page state and re-renders.
 // Styling reads --tv-* custom properties (presentable light defaults).
-import { pageList } from './index';
+import { buildPageList } from './index';
 
 export type Row = Record<string, unknown>;
 
@@ -80,6 +80,10 @@ export interface TableViewProps {
   onReorderColumns: (order: string[]) => void;
   streaming: boolean;
   status: 'idle' | 'running' | 'saved';
+  /** Phone dock layout: the page scrolls the table — no internal scroller,
+   *  header sticks `headerTop` px down (below the app bar), the row-index
+   *  column sticks left; the pager/status footers are the app bar's job. */
+  pageScroll?: { headerTop: number };
 }
 
 const GRIP_SVG = '<svg class="tv-grip" viewBox="0 0 16 16" width="12" height="12" fill="none" ' +
@@ -115,7 +119,9 @@ export function mountTableView(container: HTMLElement, p: TableViewProps): void 
 
   const scroller = document.createElement('div');
   scroller.setAttribute('data-tv-scroller', '');
-  scroller.style.cssText = 'flex:1;overflow:auto;min-height:0';
+  scroller.style.cssText = p.pageScroll
+    ? 'flex:1;overflow:visible'
+    : 'flex:1;overflow:auto;min-height:0';
 
   if (p.streaming) {
     const banner = document.createElement('div');
@@ -136,7 +142,8 @@ export function mountTableView(container: HTMLElement, p: TableViewProps): void 
     'font-size:12.5px;font-variant-numeric:tabular-nums';
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
-  const HEADER_CSS = 'position:sticky;top:' + (p.streaming ? '29px' : '0') + ';z-index:1;' +
+  const headerTop = p.pageScroll ? p.pageScroll.headerTop : (p.streaming ? 29 : 0);
+  const HEADER_CSS = 'position:sticky;top:' + headerTop + 'px;z-index:1;' +
     'background:var(--tv-surface2,#f7f6fb);color:var(--tv-ink2,#42356e);text-align:left;' +
     'padding:0 10px;height:32px;border-bottom:1px solid var(--tv-line2,#c9c9c9);' +
     'border-right:1px solid var(--tv-line,#DCDCDC);user-select:none;' +
@@ -144,7 +151,8 @@ export function mountTableView(container: HTMLElement, p: TableViewProps): void 
   const corner = document.createElement('th'); // row-number column
   corner.textContent = '#';
   corner.style.cssText = HEADER_CSS + ';text-align:right;color:var(--tv-ink4,#a9a2c4);' +
-    'font-family:var(--tv-font-mono,monospace);font-weight:400';
+    'font-family:var(--tv-font-mono,monospace);font-weight:400' +
+    (p.pageScroll ? ';left:0;z-index:2' : '');
   headRow.appendChild(corner);
   let dragging: string | null = null;
   for (const col of p.columns) {
@@ -190,9 +198,11 @@ export function mountTableView(container: HTMLElement, p: TableViewProps): void 
     const abs = p.pageStart + i;
     const tr = document.createElement('tr');
     const num = document.createElement('td');
+    num.setAttribute('data-tv-index', '');
     num.textContent = String(abs + 1);
     num.style.cssText = CELL_CSS + ';color:var(--tv-ink4,#a9a2c4);text-align:right;' +
-      'background:var(--tv-surface2,#f7f6fb)';
+      'background:var(--tv-surface2,#f7f6fb)' +
+      (p.pageScroll ? ';position:sticky;left:0;z-index:1' : '');
     tr.appendChild(num);
     for (const col of p.columns) {
       const td = document.createElement('td');
@@ -211,6 +221,9 @@ export function mountTableView(container: HTMLElement, p: TableViewProps): void 
   table.appendChild(tbody);
   scroller.appendChild(table);
   container.appendChild(scroller);
+
+  // Page-as-scroller mode: paging and status live in the host's app bar.
+  if (p.pageScroll) return;
 
   // Pagination bar: range readout left, prev/next chevrons around the windowed list.
   const pager = document.createElement('div');
@@ -239,7 +252,7 @@ export function mountTableView(container: HTMLElement, p: TableViewProps): void 
   prev.style.cssText = PAGE_BTN + (prev.disabled ? ';color:var(--tv-ink4,#a9a2c4);cursor:default' : '');
   prev.addEventListener('click', () => p.onPageChange(p.page - 1));
   pager.appendChild(prev);
-  for (const item of pageList(p.page, p.pageCount)) {
+  for (const item of buildPageList(p.page, p.pageCount)) {
     if (item === '…') {
       const dots = document.createElement('span');
       dots.textContent = '…';

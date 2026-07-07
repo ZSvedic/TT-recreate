@@ -96,6 +96,15 @@ Then('the {string} card\'s secondary default is {string}', async (p: string, id:
   assert.equal(await row.getAttribute('data-mc-model'), id);
 });
 
+Then('the {string} default row shows the price {string}', async (role: string, price: string) => {
+  const row = page.locator(`[data-mc-role="${role}"]`);
+  assert.equal(await row.locator('[data-mc-price]').textContent(), price);
+});
+
+Then('the {string} card shows the env hint {string}', async (p: string, hint: string) => {
+  assert.equal(await page.textContent(`[data-mc-card="${p}"] [data-mc-envhint]`), hint);
+});
+
 Then('the {string} card\'s Get-API-key link opens {string} in a new tab', async (p: string, url: string) => {
   const link = page.locator(`[data-mc-keyurl="${p}"]`);
   assert.equal(await link.getAttribute('href'), url);

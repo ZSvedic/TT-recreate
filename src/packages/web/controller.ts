@@ -16,11 +16,11 @@ import { fetchTable, serializeFlow, type FormatId } from '@tamedtable/file-io';
 import { pageCountFor, clampPage, pageSlice } from '@tamedtable/table-view';
 import { parseTours, type TourScenario, type TourStep } from '@tamedtable/gherkin-tour';
 import { fingerprint } from '@tamedtable/cassette';
-import { DiagnosticsManager, MAX_BODY, type DiagEvent } from './diagnostics.ts';
+import { DiagnosticsManager, MAX_BODY, type DiagEvent } from './controller-diagnostics.ts';
 
 export type Engine = ReturnType<typeof createHeadlessRunner>;
 
-export interface ChatMessage { role: 'user' | 'assistant'; text: string; error?: boolean }
+export interface ChatMessage { role: 'user' | 'assistant'; text: string; error?: boolean; debug?: RequestDebugInfo }
 
 export interface ContinuousVoiceHandlers {
   onSegment: (clip: Blob) => void | Promise<void>;
@@ -367,13 +367,14 @@ export class WebController {
     this.activity = 'running';
     try {
       await this.engine().request(text);
-      this.messages.push({ role: 'assistant', text: this.assistantText() });
+      this.messages.push({ role: 'assistant', text: this.assistantText(), debug: this.lastDebug ?? undefined });
       this.recordTurn(text);
       this.clampPageIntoRange();
     } catch (e) {
       const friendly = this.mapProviderError((e as Error).message);
       this.pushToast(friendly);
-      this.messages.push({ role: 'assistant', text: `Error: ${friendly}`, error: true });
+      const debug = (e as { debug?: RequestDebugInfo }).debug ?? this.lastDebug ?? undefined;
+      this.messages.push({ role: 'assistant', text: `Error: ${friendly}`, error: true, debug });
     } finally {
       this.activity = 'idle';
     }
@@ -390,6 +391,15 @@ export class WebController {
     this.page = 1;
     this.selection = null;
     this.activity = 'idle';
+    // Chat furniture, not a change: no undo entry, no toast (behavior.md #WebUI).
+    const rows = this.engine().currentRows().length;
+    const cols = this.columnIds().length;
+    this.messages.push({ role: 'assistant', text: `Loaded ${baseName(name)} — ${rows} rows, ${cols} columns.` });
+  }
+
+  /** The Requests-header count: the spec's transformation count. */
+  requestCount(): number {
+    return this.tryModify((s) => s.transformations.length) ?? 0;
   }
 
   say(command: string): void {
@@ -475,7 +485,7 @@ export class WebController {
   currentPage(): number { return clampPage(this.page, this.pageCount()); }
   goToPage(page: number): void { this.page = clampPage(page, this.pageCount()); }
   private clampPageIntoRange(): void { this.page = clampPage(this.page, this.pageCount()); }
-  pageRows(): Row[] { return pageSlice(this.engine().currentRows(), this.pageSize, this.currentPage()); }
+  pageRows(): Row[] { return pageSlice(this.engine().currentRows(), this.currentPage(), this.pageSize); }
 
   columnIds(): string[] { return this.tryModify((s) => s.columns.map((c) => c.id)) ?? []; }
 
@@ -599,12 +609,13 @@ export class WebController {
         audio: { data, mediaType },
         onTranscript: (t) => { bubble.text = `🎙 ${t}`; },
       });
-      this.messages.push({ role: 'assistant', text: this.assistantText() });
+      this.messages.push({ role: 'assistant', text: this.assistantText(), debug: this.lastDebug ?? undefined });
       this.recordTurn(bubble.text);
     } catch (e) {
       const friendly = `Voice input failed: ${this.mapProviderError((e as Error).message)}`;
       this.pushToast(friendly);
-      this.messages.push({ role: 'assistant', text: `Error: ${friendly}`, error: true });
+      const debug = (e as { debug?: RequestDebugInfo }).debug ?? this.lastDebug ?? undefined;
+      this.messages.push({ role: 'assistant', text: `Error: ${friendly}`, error: true, debug });
     } finally {
       this.activity = 'idle';
     }
@@ -688,6 +699,8 @@ export class WebController {
   isTutorialActive(): boolean { return this.stepIndex >= 0 && this.stepIndex < this.tourSteps.length && !this.tourDone; }
   isTutorialDone(): boolean { return this.tourDone; }
   currentTutorialStepNumber(): number | null { return this.isTutorialActive() ? this.stepIndex + 1 : null; }
+  /** The highlighted step; null on the terminal stop. */
+  currentTutorialStep(): TourStep | null { return this.isTutorialActive() ? this.tourSteps[this.stepIndex]! : null; }
   tutorialStepCount(): number { return this.tourSteps.length; }
   selectedTourName(): string { return this.selectedTour?.name ?? ''; }
   goldenAvailable(): boolean { return this.goldenText !== null; }
@@ -724,7 +737,13 @@ export class WebController {
   }
 
   prevStep(): void {
-    if (this.stepIndex > 0) this.stepIndex--;
+    // Previous stays live on the terminal stop (behavior.md #TutorialMode).
+    if (this.tourDone) {
+      this.tourDone = false;
+      this.stepIndex = Math.max(0, this.tourSteps.length - 1);
+    } else if (this.stepIndex > 0) {
+      this.stepIndex--;
+    }
     this.updatePrefill();
   }
 

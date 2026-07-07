@@ -104,8 +104,16 @@ export class TourDriver {
   play(): void { this.index = 0; this._done = false; }
   get active(): boolean { return this.index >= 0 && this.index < this.steps.length && !this._done; }
   get done(): boolean { return this._done; }
+  isActive(): boolean { return this.active; }
+  isDone(): boolean { return this._done; }
   currentStep(): { kind: string; arg: string } | null { return this.active ? this.steps[this.index]! : null; }
   currentElementId(): string | null { return this.active ? this.elementIdFor(this.steps[this.index]!.kind) : null; }
+  /** 1-based; null on the terminal stop. */
+  currentStepNumber(): number | null { return this.active ? this.index + 1 : null; }
+  /** Includes the terminal stop, so progress reads "N of N" there. */
+  stepCount(): number { return this.steps.length + 1; }
+  /** Abandons the tour: nothing further runs, no onFinish. */
+  cancel(): void { this.index = -1; this._done = false; }
 
   async next(): Promise<void> {
     if (!this.active) return;

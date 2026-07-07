@@ -763,6 +763,11 @@ directory; their list is frozen at build time by the Vite config and
 surfaced in the **Open sample…** picker dialog — one click loads the
 sample. The URL dialog stays URL-only.
 
+Loading a table (any source — sample, local file, URL) posts an assistant
+note into the chat — `Loaded <file> — N rows, M columns.` — so the
+conversation records what the requests that follow operate on. The note is
+chat furniture, not a change: it adds no undo entry and no toast.
+
 The web shell uses the existing `Runner` interface unmodified.
 Streaming chunks fire the same callback; the front-end debounces
 them into table updates. A web session does not share state with a
@@ -859,6 +864,9 @@ popover; moving the cursor away closes it; clicking toggles it. The web
 chat does not parse colon commands — undo/redo and the saves are toolbar
 buttons (dock actions on mobile), and a typed `:undo` goes to the model
 as plain text.
+
+The Requests header counts the spec's transformations — `0` on a fresh
+load, climbing as requests commit, falling back on Undo.
 
 After a successful request, the assistant chat bubble shows the
 transformed expressions — up to 7 lines with bodies truncated to 240

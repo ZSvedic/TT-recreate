@@ -8,4 +8,4 @@ export { detectFormat } from '@tamedtable/file-io';
 export {
   DiagnosticsManager, redactValue, evictEvents, buildReportMarkdown,
   MAX_EVENTS, MAX_BYTES, MAX_BODY, type DiagEvent, type DiagLevel,
-} from './diagnostics.ts';
+} from './controller-diagnostics.ts';

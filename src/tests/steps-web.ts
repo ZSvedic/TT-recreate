@@ -175,6 +175,26 @@ Then('a user bubble shows {string}', function (this: TTWorld, s: string) {
 Then('no user bubble shows {string}', function (this: TTWorld, s: string) {
   assert.ok(!ctl(this).messages.some((m) => m.role === 'user' && m.text.includes(s)));
 });
+Then('no user bubble is shown', function (this: TTWorld) {
+  assert.deepEqual(ctl(this).messages.filter((m) => m.role === 'user'), []);
+});
+Then('the chat request count is {int}', function (this: TTWorld, n: number) {
+  assert.equal(ctl(this).requestCount(), n);
+});
+Then('the last assistant message carries request detail', function (this: TTWorld) {
+  const last = ctl(this).messages.filter((m) => m.role === 'assistant').at(-1);
+  assert.ok(last, 'no assistant message');
+  assert.ok(last!.debug, `no debug on: ${JSON.stringify(last)}`);
+});
+Then('the last assistant message is an error', function (this: TTWorld) {
+  const last = ctl(this).messages.filter((m) => m.role === 'assistant').at(-1);
+  assert.ok(last?.error, `not an error: ${JSON.stringify(last)}`);
+});
+Then('the request detail names the model {string}', function (this: TTWorld, model: string) {
+  const last = ctl(this).messages.filter((m) => m.role === 'assistant').at(-1);
+  assert.ok(last?.debug?.modelCalls.some((c) => c.model === model),
+    `modelCalls were: ${JSON.stringify(last?.debug?.modelCalls)}`);
+});
 Then('an assistant bubble is shown', function (this: TTWorld) {
   assert.ok(ctl(this).messages.some((m) => m.role === 'assistant'));
 });
@@ -303,8 +323,8 @@ When('user redoes the last change', async function (this: TTWorld) { await ctl(t
 When('user jumps to history entry {int}', async function (this: TTWorld, i: number) {
   await ctl(this).jumpTo(i);
 });
-Then('the history timeline shows {int} entries', function (this: TTWorld, n: number) {
-  assert.equal(ctl(this).historyLabels().length, n);
+Then(/^the history timeline shows (\d+) entr(?:y|ies)$/, function (this: TTWorld, n: string) {
+  assert.equal(ctl(this).historyLabels().length, Number(n));
 });
 Then('the history cursor is at entry {int}', function (this: TTWorld, i: number) {
   assert.equal(ctl(this).historyCursor(), i);

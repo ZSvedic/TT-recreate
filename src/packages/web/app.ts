@@ -15,6 +15,8 @@ import {
   applyTheme, mountToasts, type Mode, type Toast, type ToastKind,
 } from '@tamedtable/ui-kit/dom.ts';
 import { lightTheme, darkTheme, typography, type Theme } from '@tamedtable/ui-kit';
+import { mountTourUi } from '@tamedtable/gherkin-tour/ui';
+import type { TourStep } from '@tamedtable/gherkin-tour';
 import { matchedReplayFetch } from '@tamedtable/cassette/matcher.ts';
 import type { FetchLike } from '@tamedtable/headless/client.ts';
 import { memRead, writeFileSync as memWrite } from './shims/fs.ts';
@@ -152,13 +154,18 @@ function toastKind(message: string): ToastKind {
 function renderToasts(): void {
   // Drain controller-pushed toasts into the shell list (stable ids drive auto-fade).
   for (const text of controller.toasts.splice(0)) {
-    toastItems.push({ id: toastSeq++, kind: toastKind(text), message: text });
+    const kind = toastKind(text);
+    toastItems.push({
+      id: toastSeq++, kind, message: text,
+      // An error toast carries the diagnostics escape hatch (behavior.md #Diagnostics).
+      ...(kind === 'error' ? { action: { label: 'Copy report' } } : {}),
+    });
   }
   mountToasts(toastHost, toastItems, (id) => {
     const at = toastItems.findIndex((t) => t.id === id);
     if (at >= 0) toastItems.splice(at, 1);
     renderToasts();
-  });
+  }, () => void navigator.clipboard?.writeText(controller.diagnosticsReport()));
 }
 
 // ---------- rendering ----------
@@ -290,16 +297,61 @@ function renderSettings(): HTMLElement {
     primaryModel: controller.model,
     secondaryModel: controller.cellModel,
     expandedProvider: controller.expandedProvider,
+    byokHelpUrl: `${BASE}FAQ.html#byok`,
+    changeModelsHelpUrl: `${BASE}FAQ.html#change-models`,
     onProviderClick: (p) => void act(() => controller.clickProviderCard(p))(),
     onKeyChange: (p, value) => controller.setKey(p as Provider, value || null),
   });
   mount();
   body.appendChild(chooser);
   const hint = el('p', 'margin:10px 0 0;font-size:11.5px;line-height:1.5;color:var(--uk-ink3)',
-    `Bring your own key — it stays in this tab. Env hints: ${(['gemini', 'openai', 'anthropic'] as Provider[])
-      .map((p) => ENV_HINTS[p]).join(', ')}.`);
+    'Bring your own key — it stays in this browser, never on a server.');
   body.appendChild(hint);
+  body.appendChild(renderDiagActions());
+  if (isMobile()) body.appendChild(renderA2hs());
   return wrap;
+}
+
+/** Diagnostics actions (behavior.md #Diagnostics): bug report, copy, clear. */
+function renderDiagActions(): HTMLElement {
+  const sec = el('div', 'margin-top:20px;padding-top:14px;border-top:1px solid var(--uk-line)');
+  sec.appendChild(el('div', 'font-size:11.5px;font-weight:600;letter-spacing:0.6px;' +
+    'text-transform:uppercase;color:var(--uk-ink3);margin-bottom:8px', 'Diagnostics'));
+  const row = el('div', 'display:flex;flex-wrap:wrap;gap:8px');
+  row.appendChild(btn('Send a bug report', BTN_PRIMARY, () => {
+    void navigator.clipboard?.writeText(controller.diagnosticsReport());
+    window.open(controller.bugReportUrl(), '_blank', 'noreferrer');
+  }, { 'data-diag-send': '' }));
+  row.appendChild(btn('Copy diagnostics report', BTN_CHROME,
+    () => void navigator.clipboard?.writeText(controller.diagnosticsReport()), { 'data-diag-copy': '' }));
+  row.appendChild(btn('Clear diagnostics', BTN_CHROME,
+    () => { controller.clearDiagnostics(); }, { 'data-diag-clear': '' }));
+  sec.appendChild(row);
+  return sec;
+}
+
+// Add to home screen (phone Settings only, behavior.md #WebUI): the install
+// prompt where the browser offers one, share-menu instructions elsewhere.
+let installPrompt: (Event & { prompt(): Promise<void> }) | null = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e as Event & { prompt(): Promise<void> };
+});
+
+function renderA2hs(): HTMLElement {
+  const sec = el('div', 'margin-top:20px;padding-top:14px;border-top:1px solid var(--uk-line)');
+  sec.setAttribute('data-a2hs', '');
+  sec.appendChild(el('div', 'font-size:11.5px;font-weight:600;letter-spacing:0.6px;' +
+    'text-transform:uppercase;color:var(--uk-ink3);margin-bottom:8px', 'Add to home screen'));
+  sec.appendChild(el('p', 'margin:0 0 10px;font-size:12.5px;line-height:1.5;color:var(--uk-ink2)',
+    'Opened from a home-screen icon the app runs full-screen, with no browser bars at all.'));
+  if (installPrompt) {
+    sec.appendChild(btn('Install app', BTN_PRIMARY, () => void installPrompt!.prompt(), { 'data-a2hs-install': '' }));
+  } else {
+    sec.appendChild(el('p', 'margin:0;font-size:12.5px;line-height:1.6;color:var(--uk-ink3)',
+      'Open your browser\u2019s share menu and choose \u201cAdd to Home Screen\u201d.'));
+  }
+  return sec;
 }
 
 function renderTours(): HTMLElement {
@@ -328,26 +380,55 @@ function renderTours(): HTMLElement {
   return wrap;
 }
 
-function renderTourBar(): HTMLElement {
-  const bar = el('div', 'flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:6px 12px;' +
-    'background:var(--uk-accentSoft);border-bottom:1px solid var(--uk-line);font-size:12.5px');
-  bar.setAttribute('data-tour-bar', '');
-  if (controller.isTutorialDone()) {
-    bar.appendChild(el('span', 'font-weight:600', `Tour “${controller.selectedTourName()}” complete 🎉`));
-    bar.appendChild(el('span', 'flex:1'));
-    bar.appendChild(btn('More tours', BTN_CHROME, act(() => { controller.finishTutorial(); toursOpen = true; })));
-    return bar;
+// ---------- tour spotlight overlay (behavior.md #TutorialMode) ----------
+
+const tourHost = el('div');
+
+/** Each step kind's live anchor; null step = the terminal "Voilà" stop. */
+function tourTargetFor(step: TourStep | null): HTMLElement | null {
+  const q = (sel: string) => app.querySelector(sel) as HTMLElement | null;
+  if (!step) return q('[data-tv-scroller]') ?? q('[data-empty-state]');
+  const kind = step.action.kind;
+  if (kind === 'load-file' || kind === 'load-lookup') return q('[data-empty-open]') ?? q('[data-tb-open]');
+  if (kind === 'prefill-chat') return isMobile() ? q('[data-mobile-input]') : q('[data-cp-input]');
+  if (kind === 'play-audio') {
+    return q('[data-testid="mic-button"]') ?? (isMobile() ? q('[data-dock="speak"]') : q('[data-cp-input]'));
   }
-  const step = controller.currentTutorialStepNumber();
-  bar.appendChild(el('span', 'font-weight:600;color:var(--uk-ink)',
-    controller.selectedTourName()));
-  bar.appendChild(el('span', 'color:var(--uk-ink2)', `Step ${step} of ${controller.tutorialStepCount()}`));
-  bar.appendChild(el('span', 'flex:1'));
-  bar.appendChild(btn('← Back', BTN_CHROME, act(() => controller.prevStep()), { 'data-tour-back': '' }));
-  bar.appendChild(btn(busy ? '…' : 'Next →', BTN_PRIMARY, act(() => controller.nextStep()), { 'data-tour-next': '' }));
-  bar.appendChild(btn('Exit tour', BTN + 'background:transparent;color:var(--uk-ink2);border:1px solid transparent',
-    act(() => controller.cancelTutorial())));
-  return bar;
+  return q('[data-tv-scroller]') ?? q('[data-empty-state]');
+}
+
+function renderTourOverlay(): void {
+  app.appendChild(tourHost);
+  if (!controller.isTutorialActive() && !controller.isTutorialDone()) {
+    mountTourUi(tourHost, {
+      cursor: {
+        isActive: () => false, isDone: () => false, currentStep: () => null,
+        currentStepNumber: () => null, stepCount: () => 0,
+        next: () => { /* idle */ }, cancel: () => { /* idle */ }, finish: () => { /* idle */ },
+      },
+      targetFor: () => null,
+      doneDescription: '',
+    });
+    return;
+  }
+  const t = theme();
+  mountTourUi(tourHost, {
+    cursor: {
+      isActive: () => controller.isTutorialActive(),
+      isDone: () => controller.isTutorialDone(),
+      currentStep: () => controller.currentTutorialStep(),
+      currentStepNumber: () => controller.currentTutorialStepNumber(),
+      stepCount: () => controller.tutorialStepCount() + 1,
+      next: () => void act(() => controller.nextStep())(),
+      prev: () => { controller.prevStep(); render(); },
+      cancel: () => { controller.cancelTutorial(); render(); },
+      finish: () => { controller.finishTutorial(); toursOpen = true; render(); },
+    },
+    targetFor: tourTargetFor,
+    doneDescription: `Voilà, "${controller.selectedTourName()}" is done.`,
+    busy,
+    theme: { background: t.surface!, text: t.ink!, border: t.line2!, accent: t.accent! },
+  });
 }
 
 // ---------- main regions ----------
@@ -361,11 +442,21 @@ function renderEmptyPane(target: HTMLElement): void {
     'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M8 10V3 M5 6l3-3 3 3 M2.5 11.5v1A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-1"/></svg>';
   pane.appendChild(iconWrap);
-  pane.appendChild(el('div', 'font-size:14px;font-weight:500;color:var(--uk-ink2)', 'Drop a CSV or JSONL file here'));
-  pane.appendChild(el('div', 'font-size:12.5px;color:var(--uk-ink3)', 'or load one from the toolbar'));
-  const open = btn('Open sample…', BTN_CHROME + 'margin-top:4px', act(() => controller.openSamplePicker()),
-    { 'data-empty-open': '' });
-  pane.appendChild(open);
+  pane.appendChild(el('div', 'font-size:15px;font-weight:600;color:var(--uk-ink)', 'What table can I tame?'));
+  const stack = el('div', 'display:flex;flex-direction:column;gap:8px;margin-top:4px;min-width:180px');
+  stack.appendChild(btn('Open sample…', BTN_CHROME + 'justify-content:center',
+    act(() => controller.openSamplePicker()), { 'data-empty-open': '' }));
+  stack.appendChild(btn('Open local…', BTN_CHROME + 'justify-content:center', () => openLocalFile(),
+    { 'data-empty-local': '' }));
+  stack.appendChild(btn('Open URL…', BTN_CHROME + 'justify-content:center',
+    act(() => controller.openUrlDialog()), { 'data-empty-url': '' }));
+  pane.appendChild(stack);
+  const tours = el('a', 'margin-top:6px;font-size:12.5px;color:var(--uk-accent);cursor:pointer;' +
+    'text-decoration:underline', 'Or start one of the tours');
+  tours.setAttribute('data-empty-tours', '');
+  tours.addEventListener('click', () => void act(() => { toursOpen = true; controller.openTutorial(); })());
+  pane.appendChild(tours);
+  pane.appendChild(el('div', 'font-size:11.5px;color:var(--uk-ink4)', 'or drop a CSV / JSONL file here'));
   pane.addEventListener('dragover', (e) => {
     e.preventDefault();
     pane.style.outline = '2px dashed var(--uk-accent)';
@@ -409,7 +500,25 @@ function renderTable(target: HTMLElement): void {
     onReorderColumns: (order) => void act(() => controller.reorderColumnFirst(order[0]!))(),
     streaming: false,
     status: controller.activityStatus(),
+    pageScroll: isMobile() ? { headerTop: 40 } : undefined,
   });
+}
+
+/** RequestDebugInfo → the chat panel's structural detail subset. */
+function toChatDetail(d: NonNullable<WebController['lastDebug']>) {
+  return {
+    request: d.userRequest,
+    model: d.modelCalls.map((c) => (c.calls > 1 ? `${c.model} ×${c.calls}` : c.model)).join(', ') || undefined,
+    inputTokens: d.inputTokens,
+    outputTokens: d.outputTokens,
+    elapsedMs: d.elapsedMs,
+    turns: d.turns.map((t) => ({
+      summary: t.outcome,
+      ops: t.ops.map((op) => JSON.stringify(op)),
+    })),
+    cellSamples: d.cellSamples.flatMap((c) =>
+      c.samples.map((s) => `${c.column}: ${JSON.stringify(s.in)} → ${JSON.stringify(s.out)}`)),
+  };
 }
 
 function renderChat(target: HTMLElement): void {
@@ -418,9 +527,12 @@ function renderChat(target: HTMLElement): void {
   side.setAttribute('data-chat', '');
   target.appendChild(side);
   mountChatPanel(side, {
-    messages: controller.messages.map((m, i) => ({ id: String(i + 1), role: m.role, text: m.text })),
+    messages: controller.messages.map((m, i) => ({
+      id: String(i + 1), role: m.role, text: m.text,
+      debug: m.debug ? toChatDetail(m.debug) : undefined,
+    })),
     streaming: busy,
-    requestCount: controller.messages.filter((m) => m.role === 'user').length,
+    requestCount: controller.requestCount(),
     prefill: controller.tutorialPrefill || null,
     onSend: (text) => void act(() => controller.sendChat(text))(),
     onCancel: () => { /* replay/batch cancel is not wired in the shell */ },
@@ -481,7 +593,8 @@ const DOCK_ICONS = {
 
 /** Bottom sheet frame that takes the dock's place; the table stays above it. */
 function mobileSheetFrame(title: string): { frame: HTMLElement; body: HTMLElement } {
-  const frame = el('div', 'flex:0 0 auto;height:300px;display:flex;flex-direction:column;' +
+  const frame = el('div', 'position:fixed;bottom:0;left:0;right:0;z-index:60;height:300px;' +
+    'display:flex;flex-direction:column;' +
     'background:var(--uk-surface);border-top:1px solid var(--uk-line)');
   frame.className = 'uk-sheet';
   frame.setAttribute('data-mobile-sheet', title.toLowerCase());
@@ -635,7 +748,8 @@ function renderMobile(): void {
   const loaded = controller.hasTableLoaded();
 
   // App bar: brand mark, file name, page/total pager.
-  const bar = el('div', 'height:40px;flex:0 0 auto;display:flex;align-items:center;gap:10px;' +
+  const bar = el('div', 'position:fixed;top:0;left:0;right:0;z-index:60;height:40px;' +
+    'display:flex;align-items:center;gap:10px;' +
     'padding:0 12px;background:var(--uk-surface);border-bottom:1px solid var(--uk-line)');
   bar.setAttribute('data-appbar', '');
   const brand = el('span', 'display:inline-flex;align-items:center;gap:5px');
@@ -661,10 +775,8 @@ function renderMobile(): void {
   }
   app.appendChild(bar);
 
-  if (controller.isTutorialActive() || controller.isTutorialDone()) app.appendChild(renderTourBar());
-
-  // Table (or the empty pane) fills the middle.
-  const main = el('div', 'flex:1;display:flex;flex-direction:column;min-height:0');
+  // Table (or the empty pane) fills the middle; the page scrolls it.
+  const main = el('div', 'flex:1;display:flex;flex-direction:column');
   renderTable(main);
   app.appendChild(main);
 
@@ -673,7 +785,8 @@ function renderMobile(): void {
   else if (mobileSheet === 'type') app.appendChild(renderTypeSheet());
   else if (mobileSheet === 'speak') app.appendChild(renderSpeakSheet());
   else {
-    const dock = el('div', 'flex:0 0 auto;height:80px;display:flex;align-items:center;' +
+    const dock = el('div', 'position:fixed;bottom:0;left:0;right:0;z-index:60;height:80px;' +
+      'display:flex;align-items:center;' +
       'justify-content:space-around;background:var(--uk-dockBg);color:var(--uk-dockInk);' +
       'border-top:1px solid var(--uk-dockBorder)');
     dock.setAttribute('data-dock-bar', '');
@@ -696,12 +809,27 @@ const dialogHost = el('div');
 
 function render(): void {
   app.innerHTML = '';
-  app.style.cssText = 'height:100vh;display:flex;flex-direction:column;' +
-    'overflow:hidden;background:var(--uk-bg);color:var(--uk-ink)';
+  // Desktop: fixed to the window, nothing scrolls the page. Phone: the page
+  // itself scrolls the table (app bar + dock pinned), with a scroll-room
+  // floor so browser bars can always be swiped away (behavior.md #WebUI).
+  app.style.cssText = isMobile()
+    ? 'min-height:calc(100dvh + 56px);display:flex;flex-direction:column;' +
+      'padding:40px 0 80px;background:var(--uk-bg);color:var(--uk-ink)'
+    : 'height:100vh;display:flex;flex-direction:column;' +
+      'overflow:hidden;background:var(--uk-bg);color:var(--uk-ink)';
+
+  // A phone tour's query step raises the Type sheet so the spotlight lands
+  // on the visible composer (behavior.md #TutorialMode).
+  const tourStepKind = controller.currentTutorialStep()?.action.kind;
+  if (isMobile() && controller.isTutorialActive()) {
+    if (tourStepKind === 'prefill-chat' && mobileSheet === 'none') mobileSheet = 'type';
+    if (tourStepKind !== 'prefill-chat' && mobileSheet === 'type') mobileSheet = 'none';
+  }
 
   if (isMobile()) {
     renderMobile();
     renderDialogLayer();
+    renderTourOverlay();
     app.appendChild(toastHost);
     renderToasts();
     return;
@@ -733,13 +861,14 @@ function render(): void {
     saveDataMenu: [
       { label: 'Save as CSV…', onClick: () => void act(() => controller.say('save as csv'))() },
       { label: 'Save as JSONL…', onClick: () => void act(() => controller.say('save as jsonl'))() },
+      { label: 'Save as Parquet…', onClick: () => void act(() => controller.say('save as parquet'))() },
+      { label: 'Save as Arrow…', onClick: () => void act(() => controller.say('save as arrow'))() },
     ],
     saveFlowMenu: [
+      { label: 'Save as Flow…', onClick: () => void act(() => controller.say('save flow'))() },
       { label: 'Save as Python…', onClick: () => void act(() => controller.say('save as python'))() },
     ],
   });
-
-  if (controller.isTutorialActive() || controller.isTutorialDone()) app.appendChild(renderTourBar());
 
   const main = el('div', 'flex:1;display:flex;min-height:0');
   renderChat(main);
@@ -747,6 +876,7 @@ function render(): void {
   app.appendChild(main);
 
   renderDialogLayer();
+  renderTourOverlay();
 
   app.appendChild(toastHost);
   renderToasts();
@@ -773,7 +903,12 @@ function renderDialogLayer(): void {
     dialogHost.appendChild(host);
     mountUrlDialog(host, {
       open: true,
-      onSubmit: (url) => void act(() => controller.loadFromUrl(url))(),
+      // Failures render inline in the dialog (no toast, stays open); success
+      // closes it via loadFromUrl and re-renders.
+      onSubmit: async (url) => {
+        await controller.loadFromUrl(url);
+        render();
+      },
       onClose: () => void act(() => controller.closeUrlDialog())(),
     });
   }

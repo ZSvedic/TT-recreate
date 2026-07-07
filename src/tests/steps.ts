@@ -12,6 +12,7 @@ import { TTWorld, fixturePath, readJsonlFile, SRC_DIR, TEMP, FIXTURES } from './
 import { makeRecorder } from './cassette.ts';
 import './steps-lib.ts';
 import './steps-web.ts';
+import './steps-shell.ts';
 
 const quoted = (s: string): string[] => [...s.matchAll(/"([^"]*)"/g)].map((m) => m[1]!);
 const unescapeLine = (s: string): string => s.replace(/\\n/g, '\n');

@@ -22,7 +22,7 @@ const log = (msg: string) => { out.textContent += `${msg}\n`; };
 function render() {
   mountTableView(document.getElementById('table')!, {
     columns,
-    rows: pageSlice(rows, PAGE_SIZE, page),
+    rows: pageSlice(rows, page, PAGE_SIZE),
     pageStart: (page - 1) * PAGE_SIZE,
     totalRows: rows.length,
     page,

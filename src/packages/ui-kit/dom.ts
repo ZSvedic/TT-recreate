@@ -2,7 +2,7 @@
 // and the theme applier. Props in, callbacks out; every element carries a
 // stable data-uk-* attribute for tests. Colors come from --uk-* CSS custom
 // properties that applyTheme() sets from a Theme object.
-import { toastDuration, type Theme } from './index';
+import { toastDurationMs, type Theme } from './index';
 import { ICONS, type IconName } from './icons';
 
 export type Mode = 'light' | 'dark';
@@ -179,16 +179,19 @@ export interface Toast {
   id: number;
   kind: ToastKind;
   message: string;
+  /** Optional inline action (e.g. an error toast's "Copy report"). */
+  action?: { label: string };
 }
 
 const LEAVE_MS = 200; // fade-out length before the auto-dismiss lands
 
 /** Renders the fixed bottom-right toast stack into `container`, replacing
- *  previous content. Each toast auto-fades after toastDuration(message) —
+ *  previous content. Each toast auto-fades after toastDurationMs(message) —
  *  marked data-uk-toast-leaving just before onDismiss — hovering pauses the
  *  countdown, and the dismiss button (data-uk-toast-dismiss) removes it at
  *  once. Renders nothing when the list is empty. */
-export function mountToasts(container: HTMLElement, toasts: Toast[], onDismiss: (id: number) => void): void {
+export function mountToasts(container: HTMLElement, toasts: Toast[], onDismiss: (id: number) => void,
+  onAction?: (id: number) => void): void {
   ensureKeyframes();
   const holder = container as HTMLElement & { __ukTimers?: number[] };
   for (const t of holder.__ukTimers ?? []) clearTimeout(t);
@@ -219,6 +222,17 @@ export function mountToasts(container: HTMLElement, toasts: Toast[], onDismiss: 
     msg.style.flex = '1';
     el.appendChild(msg);
 
+    if (toast.action) {
+      const action = document.createElement('button');
+      action.setAttribute('data-uk-toast-action', '');
+      action.textContent = toast.action.label;
+      action.style.cssText = 'flex:0 0 auto;background:transparent;cursor:pointer;font:inherit;' +
+        'font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:4px;' +
+        'border:1px solid var(--uk-line2,#c9c9c9);color:inherit';
+      action.addEventListener('click', () => onAction?.(toast.id));
+      el.appendChild(action);
+    }
+
     const dismiss = document.createElement('button');
     dismiss.setAttribute('data-uk-toast-dismiss', '');
     dismiss.textContent = '×';
@@ -231,7 +245,7 @@ export function mountToasts(container: HTMLElement, toasts: Toast[], onDismiss: 
       el.setAttribute('data-uk-toast-leaving', '');
       el.style.opacity = '0';
       holder.__ukTimers!.push(window.setTimeout(() => onDismiss(toast.id), LEAVE_MS));
-    }, toastDuration(toast.message));
+    }, toastDurationMs(toast.message));
     let timer = schedule();
     holder.__ukTimers.push(timer);
     el.addEventListener('mouseenter', () => clearTimeout(timer));

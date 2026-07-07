@@ -8,9 +8,9 @@ import {
 } from '@tamedtable/model-config';
 import { parseTours, TourDriver, type TourScenario } from '@tamedtable/gherkin-tour';
 import { buildVoicePrompt, type VoiceContext } from '@tamedtable/voice-input';
-import { pageCountFor, clampPage, pageSlice, pageList } from '@tamedtable/table-view';
-import { sampleLabel } from '@tamedtable/toolbar';
-import { BRAND, lightTheme, darkTheme, toastDuration } from '@tamedtable/ui-kit';
+import { pageCountFor, clampPage, pageSlice, buildPageList } from '@tamedtable/table-view';
+import { sampleKind } from '@tamedtable/toolbar';
+import { brand, lightTheme, darkTheme, toastDurationMs } from '@tamedtable/ui-kit';
 import { TTWorld } from './world.ts';
 
 const nl = (s: string): string => s.replace(/\\n/g, '\n');
@@ -198,6 +198,22 @@ When('the driver finishes', function (this: TTWorld) {
   (this.scratch.driver as TourDriver).finish();
 });
 
+When('the driver cancels the tour', function (this: TTWorld) {
+  (this.scratch.driver as TourDriver).cancel();
+});
+
+Then('the driver step count is {int}', function (this: TTWorld, n: number) {
+  assert.equal((this.scratch.driver as TourDriver).stepCount(), n);
+});
+
+Then('the driver step number is {int}', function (this: TTWorld, n: number) {
+  assert.equal((this.scratch.driver as TourDriver).currentStepNumber(), n);
+});
+
+Then('the driver step number is null', function (this: TTWorld) {
+  assert.equal((this.scratch.driver as TourDriver).currentStepNumber(), null);
+});
+
 Then('the driver is active', function (this: TTWorld) { assert.ok((this.scratch.driver as TourDriver).active); });
 Then('the driver is not active', function (this: TTWorld) { assert.ok(!(this.scratch.driver as TourDriver).active); });
 Then('the driver is done', function (this: TTWorld) { assert.ok((this.scratch.driver as TourDriver).done); });
@@ -369,6 +385,32 @@ Then('ALL_MODELS contains at least one model with provider {string}', function (
   assert.ok(ALL_MODELS.some((m) => m.provider === p));
 });
 
+Then('ALL_MODELS contains the model {string}', function (this: TTWorld, id: string) {
+  assert.ok(ALL_MODELS.some((m) => m.id === id), `no ${id} in catalogue`);
+});
+Then('ALL_MODELS does not contain the model {string}', function (this: TTWorld, id: string) {
+  assert.ok(!ALL_MODELS.some((m) => m.id === id), `${id} unexpectedly in catalogue`);
+});
+Then('every ALL_MODELS entry has inUsdPerMtok and outUsdPerMtok prices', function () {
+  for (const m of ALL_MODELS) {
+    assert.equal(typeof m.inUsdPerMtok, 'number', `${m.id} has no inUsdPerMtok`);
+    assert.equal(typeof m.outUsdPerMtok, 'number', `${m.id} has no outUsdPerMtok`);
+  }
+});
+Then('the model {string} costs {float} in and {float} out per Mtok', function (this: TTWorld, id: string, inPrice: number, outPrice: number) {
+  const m = ALL_MODELS.find((x) => x.id === id);
+  assert.ok(m, `no ${id} in catalogue`);
+  assert.equal(m!.inUsdPerMtok, inPrice);
+  assert.equal(m!.outUsdPerMtok, outPrice);
+});
+Then('DEFAULTS names the {word} primary {string} and secondary {string}', async function (this: TTWorld, p: string, primary: string, secondary: string) {
+  const { DEFAULTS } = await import('@tamedtable/model-config');
+  const d = (DEFAULTS as Record<string, { primary: string; secondary: string }>)[p];
+  assert.ok(d, `no DEFAULTS entry for ${p}`);
+  assert.equal(d.primary, primary);
+  assert.equal(d.secondary, secondary);
+});
+
 Then('every ALL_MODELS entry has a voiceInput boolean field', function () {
   for (const m of ALL_MODELS) assert.equal(typeof m.voiceInput, 'boolean');
 });
@@ -388,27 +430,27 @@ Then('clampPage {int} of {int} pages is {int}', function (this: TTWorld, page: n
 });
 
 Then('pageSlice of {int} rows at size {int} page {int} has {int} rows', function (this: TTWorld, rows: number, size: number, page: number, expected: number) {
-  assert.equal(pageSlice(Array.from({ length: rows }, (_v, i) => i), size, page).length, expected);
+  assert.equal(pageSlice(Array.from({ length: rows }, (_v, i) => i), page, size).length, expected);
 });
 
 Then('the page list for page {int} of {int} is {string}', function (this: TTWorld, page: number, total: number, expected: string) {
-  assert.equal(pageList(page, total).join(','), expected);
+  assert.equal(buildPageList(page, total).join(','), expected);
 });
 
 // ---------- toolbar ----------
 
 Then('a toolbar sample named {string} is labelled {string}', function (this: TTWorld, name: string, label: string) {
-  assert.equal(sampleLabel(name), label);
+  assert.equal(sampleKind(name), label);
 });
 
 // ---------- ui-kit ----------
 
 Then('a toast reading {string} stays on screen for {int} ms', function (this: TTWorld, msg: string, ms: number) {
-  assert.equal(toastDuration(msg), ms);
+  assert.equal(toastDurationMs(msg), ms);
 });
 
 Then('a toast reading a {int}-character message stays on screen for {int} ms', function (this: TTWorld, chars: number, ms: number) {
-  assert.equal(toastDuration('x'.repeat(chars)), ms);
+  assert.equal(toastDurationMs('x'.repeat(chars)), ms);
 });
 
 When('the light and dark themes are compared', function (this: TTWorld) {
@@ -423,9 +465,9 @@ Then('the themes differ in their values', function () {
   assert.ok(Object.keys(lightTheme).some((k) => lightTheme[k] !== darkTheme[k]));
 });
 
-Then('brand ink is {string}', function (this: TTWorld, hex: string) { assert.equal(BRAND.ink, hex); });
-Then('brand accent is {string}', function (this: TTWorld, hex: string) { assert.equal(BRAND.accent, hex); });
-Then('brand line is {string}', function (this: TTWorld, hex: string) { assert.equal(BRAND.line, hex); });
+Then('brand ink is {string}', function (this: TTWorld, hex: string) { assert.equal(brand.ink, hex); });
+Then('brand accent is {string}', function (this: TTWorld, hex: string) { assert.equal(brand.accent, hex); });
+Then('brand line is {string}', function (this: TTWorld, hex: string) { assert.equal(brand.line, hex); });
 
 function lightness(color: string): number {
   const ok = color.match(/oklch\(\s*([\d.]+)/);

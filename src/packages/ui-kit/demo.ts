@@ -38,7 +38,7 @@ document.getElementById('split')!.appendChild(createSplitButton({
 const toastHost = document.getElementById('toasts')!;
 let toasts: Toast[] = [];
 let nextId = 1;
-const renderToasts = () => mountToasts(toastHost, toasts, dismiss);
+const renderToasts = () => mountToasts(toastHost, toasts, dismiss, (id) => log(`toast action ${id}`));
 function dismiss(id: number): void {
   toasts = toasts.filter((t) => t.id !== id);
   log(`toast ${id} dismissed`);
@@ -65,6 +65,13 @@ controls.appendChild(Object.assign(
 controls.appendChild(Object.assign(
   createButton({ label: 'Add error toast', variant: 'chrome', onClick: () => addToast('error', 'Query failed: table not found.') }),
   { id: 'add-error' }));
+controls.appendChild(Object.assign(
+  createButton({ label: 'Add action toast', variant: 'chrome', onClick: () => {
+    toasts = [...toasts, { id: nextId++, kind: 'error', message: 'Something broke.', action: { label: 'Copy report' } }];
+    log('action toast added');
+    renderToasts();
+  } }),
+  { id: 'add-action' }));
 const toggleSlot = Object.assign(document.createElement('span'), { id: 'theme-toggle' });
 controls.appendChild(toggleSlot);
 function renderToggle(): void {

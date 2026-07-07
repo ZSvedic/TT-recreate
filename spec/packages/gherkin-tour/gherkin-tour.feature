@@ -295,6 +295,32 @@ Feature: Gherkin Tour parser
       And the driver is not active
       And the current step is null
 
+    @headless
+    Scenario: stepCount includes the terminal stop and numbering stops there
+      Given a tour with steps:
+        | kind         | arg   |
+        | load-file    | x.csv |
+        | prefill-chat | do it |
+      When the driver plays the tour
+      Then the driver step count is 3
+      And the driver step number is 1
+      When the driver advances 2 times
+      Then the driver is done
+      And the driver step number is null
+
+    @headless
+    Scenario: cancel abandons the tour without running anything further
+      Given a tour with steps:
+        | kind         | arg   |
+        | load-file    | x.csv |
+        | prefill-chat | do it |
+      When the driver plays the tour
+      And the driver advances 1 time
+      And the driver cancels the tour
+      Then the driver is not active
+      And the driver is not done
+      And the adapter calls were "loadFile(x.csv)"
+
   Rule: Finishing calls the adapter's onFinish hook
 
     @headless
