@@ -16,6 +16,22 @@ function clipBlob(name: string): Blob {
 
 // ---------- keys / providers / settings ----------
 
+Given('the TamedTable web app with persistent storage and no env key', function (this: TTWorld) {
+  let blob: Record<string, unknown> = {};
+  this.storagePort = {
+    read: () => structuredClone(blob),
+    write: (c) => { blob = { ...blob, ...c }; },
+    clear: () => { blob = {}; },
+  };
+  this.controllerEnv = {};
+  this.ensureController();
+});
+
+When('the web app reloads', function (this: TTWorld) {
+  this.controller = null;
+  this.ensureController();
+});
+
 Given('the API key has not been set', function (this: TTWorld) {
   ctl(this).clearKeys();
 });

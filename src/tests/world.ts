@@ -6,6 +6,7 @@ import type { Row, ChunkUpdate } from '@tamedtable/core';
 import { createHeadlessRunner, type HeadlessRunnerOptions, type Runner } from '@tamedtable/headless';
 import { CliSession } from '@tamedtable/cli';
 import { WebController, type TutorialManifestEntry } from '@tamedtable/web';
+import type { StoragePort } from '@tamedtable/model-config';
 import { parseTours } from '@tamedtable/gherkin-tour';
 import { makeRecorder } from './cassette.ts';
 import { readdirSync, writeFileSync } from 'node:fs';
@@ -52,6 +53,9 @@ export class TTWorld extends CucumberWorld {
   controller: WebController | null = null;
   capturedApiKey: string | null = null;
   fsAccess = true;
+  /** Injected StoragePort + env override for the key-persistence scenarios. */
+  storagePort: StoragePort | null = null;
+  controllerEnv: Record<string, string | undefined> | null = null;
   urlRoutes = new Map<string, string>();
   replayRecorders: Array<ReturnType<typeof makeRecorder>> = [];
   runner: (Runner & { exportPython(): Promise<string> }) | null = null;
@@ -111,7 +115,8 @@ export class TTWorld extends CucumberWorld {
         fsAccess: this.fsAccess,
         // Replay needs no real key; a default one is present so only scenarios
         // that explicitly clear it ("the API key has not been set") hit guards.
-        env: { GEMINI_API_KEY: 'placeholder-key' },
+        env: this.controllerEnv ?? { GEMINI_API_KEY: 'placeholder-key' },
+        ...(this.storagePort ? { storage: this.storagePort } : {}),
         tutorialSources: {
           manifest: tutorialManifest(),
           loadFeature: async (name) => readFileSync(join(FIXTURES, name), 'utf8'),
@@ -187,4 +192,6 @@ Before(function (this: TTWorld, { pickle, gherkinDocument }) {
 
 After(async function (this: TTWorld) {
   if (this.pending) await this.pending.catch(() => { /* cancelled / failed mid-flight */ });
+  // A fake localStorage installed by a storage scenario must not leak.
+  delete (globalThis as { localStorage?: unknown }).localStorage;
 });

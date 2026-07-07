@@ -1,1 +1,1 @@
-{"name": "@tamedtable/model-config", "version": "0.1.0", "type": "module", "main": "index.ts", "exports": {".": "./index.ts", "./env": "./env.ts", "./dom.ts": "./dom.ts"}}
+{"name": "@tamedtable/model-config", "version": "0.1.0", "type": "module", "main": "index.ts", "exports": {".": "./index.ts", "./env": "./env.ts", "./dom.ts": "./dom.ts", "./storage": "./storage.ts", "./storage.ts": "./storage.ts"}}

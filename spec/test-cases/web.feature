@@ -45,6 +45,25 @@ Feature: Web front-end
       When user sends the chat message "normalize dob col"
       Then the captured model request carried API key "brand-new-key"
 
+    @web
+    Scenario: A key entered in Settings survives a reload and reaches the wire
+      Given the TamedTable web app with persistent storage and no env key
+      And the gemini key is set to "persisted-key"
+      When the web app reloads
+      And load "customers-input.csv"
+      And the LLM API captures each request's key
+      And user sends the chat message "normalize dob col"
+      Then the captured model request carried API key "persisted-key"
+
+    @web
+    Scenario: A stored provider choice survives a reload
+      Given the TamedTable web app with persistent storage and no env key
+      When user selects the provider "anthropic"
+      And the web app reloads
+      Then the configured provider is "anthropic"
+      And the configured model is "claude-sonnet-4-6"
+      And the configured cellModel is "claude-haiku-4-5"
+
   Rule: Files move through a dialog handshake
 
     @web
