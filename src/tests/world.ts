@@ -50,6 +50,7 @@ export class TTWorld extends CucumberWorld {
   featureName = '';
   recorder: ReturnType<typeof makeRecorder> | null = null;
   controller: WebController | null = null;
+  capturedApiKey: string | null = null;
   fsAccess = true;
   urlRoutes = new Map<string, string>();
   replayRecorders: Array<ReturnType<typeof makeRecorder>> = [];

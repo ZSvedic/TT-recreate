@@ -77,6 +77,20 @@ Given('the LLM API returns a 401 unauthorized error', async function (this: TTWo
   ));
 });
 
+Given("the LLM API captures each request's key", async function (this: TTWorld) {
+  await ctl(this).setFetchOverride(async (_input, init) => {
+    this.capturedApiKey = (init?.headers as Record<string, string> | undefined)?.['x-goog-api-key'] ?? null;
+    return new Response(
+      '{"error":{"code":401,"message":"API key not valid.","status":"UNAUTHENTICATED"}}',
+      { status: 401, statusText: 'Unauthorized' },
+    );
+  });
+});
+
+Then('the captured model request carried API key {string}', function (this: TTWorld, key: string) {
+  assert.equal(this.capturedApiKey, key);
+});
+
 Given('the Gemini endpoint returns an error', async function (this: TTWorld) {
   await ctl(this).setFetchOverride(async () => new Response(
     '{"error":{"code":400,"message":"Request contains an invalid argument.","status":"INVALID_ARGUMENT"}}',

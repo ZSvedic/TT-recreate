@@ -36,6 +36,15 @@ Feature: Web front-end
       And user saves the API key "sk-ant-example-key"
       Then the configured API key is "sk-ant-example-key"
 
+    @web
+    Scenario: A key entered after the table is loaded is used by the very next request
+      Given the TamedTable web app
+      And load "customers-input.csv"
+      And the LLM API captures each request's key
+      And the gemini key is set to "brand-new-key"
+      When user sends the chat message "normalize dob col"
+      Then the captured model request carried API key "brand-new-key"
+
   Rule: Files move through a dialog handshake
 
     @web

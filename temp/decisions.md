@@ -140,3 +140,10 @@
   mobile (the spec's page-scrolls-the-table + frozen header/index refinement
   is not implemented); tour steps show in the tour bar, not a Type-sheet
   spotlight — logged as remaining.
+- **The engine re-checks its API key lazily.** `buildEngine` records the key
+  it was built with; `sendChat` / voice / Python export call
+  `ensureEngineCurrent()`, which rebuilds (table preserved) when the built
+  key differs from the key Settings now holds. Fixes the deployed bug where
+  a key typed after loading a table never reached the wire — every live
+  request carried the literal `placeholder` and Google answered 401
+  (pinned by web.feature "A key entered after the table is loaded…").
