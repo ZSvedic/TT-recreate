@@ -428,7 +428,8 @@ transformation. Ctrl-C while idle closes the REPL.
 
 `tamedtable execute <flow>` replays a saved flow against a CSV. `--input`
 overrides the source path recorded in the flow; `--output` is required and
-must be `.jsonl`. No LLM call happens on this path.
+must be `.csv` or `.jsonl` (convert.feature's execute scenarios use both).
+No LLM call happens on this path.
 
 ### Discovery (#CliFlags)
 

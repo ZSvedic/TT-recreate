@@ -18,6 +18,15 @@
         "typescript": "^5.9.2",
       },
     },
+    "packages/bench": {
+      "name": "@tamedtable/bench",
+      "version": "0.1.0",
+      "dependencies": {
+        "@tamedtable/core": "workspace:*",
+        "@tamedtable/headless": "workspace:*",
+        "@tamedtable/model-config": "workspace:*",
+      },
+    },
     "packages/cassette": {
       "name": "@tamedtable/cassette",
       "version": "0.1.0",
@@ -172,6 +181,8 @@
     "@duckdb/node-bindings-win32-x64": ["@duckdb/node-bindings-win32-x64@1.4.1-r.2", "", { "os": "win32", "cpu": "x64" }, "sha512-KnzmN5TVOfYzhZWuzUrzLdt5aPHg2EKaIJgnCOifGYf4YH2gPSpct4wWCKGuRSb0JcACFNaKI42kcRMo9k5RXw=="],
 
     "@swc/helpers": ["@swc/helpers@0.5.23", "", { "dependencies": { "tslib": "^2.8.0" } }, "sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw=="],
+
+    "@tamedtable/bench": ["@tamedtable/bench@workspace:packages/bench"],
 
     "@tamedtable/cassette": ["@tamedtable/cassette@workspace:packages/cassette"],
 

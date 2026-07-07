@@ -7,7 +7,9 @@ export {
   detectFormat, fetchTable, formatForExtension, sampleNameFromUrl, serializeFlow,
   type FormatId, type PickedFile,
 } from './browser-core';
+import { formatForExtension as detectByExtension } from './browser-core';
 import type { FormatId } from './browser-core';
+import type { TablePlan } from '@tamedtable/table-plan';
 
 // ---------- CSV ----------
 import { parse as csvParse } from 'csv/sync';
@@ -153,4 +155,27 @@ export async function loadCodec(id: FormatId): Promise<FormatCodec> {
   const codec = CODECS[id];
   if (!codec) throw new Error(`unknown file type "${id}"`);
   return codec;
+}
+
+/** Detect from `name`, parse the bytes, and build a fresh-load TablePlan —
+ *  the browser's path-free counterpart to core.loadCsv. */
+export async function parseTable(name: string, bytes: Uint8Array): Promise<{ rows: Row[]; spec: TablePlan }> {
+  const format = detectByExtension(name);
+  if (!format) throw new Error(`could not detect the table format of "${name}"`);
+  const codec = await loadCodec(format);
+  const { rows, columns } = await codec.parse(bytes, name);
+  return {
+    rows,
+    spec: { table: name, columns: columns.map((id) => ({ id })), transformations: [] } as unknown as TablePlan,
+  };
+}
+
+// ---------- FilePort — the open/save dialog seam ----------
+
+export type SaveOutcome = { status: 'saved' | 'downloaded'; name: string } | { status: 'cancelled' };
+
+export interface FilePort {
+  hasFileSystemAccess: boolean;
+  pickOpen(accept: string): Promise<{ name: string; bytes: Uint8Array } | null>;
+  pickSave(suggestedName: string, accept: string, content: Uint8Array): Promise<SaveOutcome>;
 }

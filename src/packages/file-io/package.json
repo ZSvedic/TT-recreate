@@ -1,1 +1,1 @@
-{ "name": "@tamedtable/file-io", "version": "0.1.0", "type": "module", "main": "index.ts", "dependencies": { "@tamedtable/table-plan": "workspace:*" } }
+{ "name": "@tamedtable/file-io", "version": "0.1.0", "type": "module", "main": "index.ts", "exports": { ".": "./index.ts", "./browser-fs": "./browser-fs.ts", "./browser-fs.ts": "./browser-fs.ts" }, "dependencies": { "@tamedtable/table-plan": "workspace:*" } }

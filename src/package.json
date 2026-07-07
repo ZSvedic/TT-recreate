@@ -1,7 +1,10 @@
 {
   "name": "tamedtable-src",
   "private": true,
-  "workspaces": ["packages/*", "tests"],
+  "workspaces": [
+    "packages/*",
+    "tests"
+  ],
   "scripts": {
     "setup": "bun install",
     "test": "bun run test:unit && bun run test:headless && bun run test:cli && bun run test:web",
@@ -12,7 +15,12 @@
     "test:web:app": "TAMEDTABLE_SCOPE=app bun tests/run-cucumber.ts web",
     "test:smoke": "bun tests/smoke.ts",
     "test:record": "TAMEDTABLE_CASSETTE=record bun tests/run-cucumber.ts headless && TAMEDTABLE_CASSETTE=record bun tests/run-cucumber.ts cli",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bench:sample": "bun packages/bench/cli.ts sample",
+    "bench:label": "bun packages/bench/cli.ts label",
+    "bench:sweep": "bun packages/bench/cli.ts sweep",
+    "bench:chart": "bun packages/bench/cli.ts chart",
+    "bench:report": "bun packages/bench/cli.ts report"
   },
   "dependencies": {
     "@cucumber/cucumber": "^12.2.0",

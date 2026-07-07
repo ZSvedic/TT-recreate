@@ -68,7 +68,9 @@ export function resolveConfig(
     : env.OPENAI_API_KEY ? 'openai'
     : env.ANTHROPIC_API_KEY ? 'anthropic'
     : stored.provider ?? 'gemini';
-  const model = env.TAMEDTABLE_MODEL ?? stored.model ?? defaultModel(provider);
+  let model = env.TAMEDTABLE_MODEL ?? stored.model ?? defaultModel(provider);
+  // Rule 7: the final primary model must belong to the resolved provider.
+  if (!env.TAMEDTABLE_MODEL && providerFor(model) !== provider) model = defaultModel(provider);
   let cellModel = env.TAMEDTABLE_CELL_MODEL ?? stored.cellModel ?? defaultCellModel(provider);
   if (providerFor(cellModel) !== providerFor(model)) cellModel = defaultCellModel(providerFor(model));
   // Only the selected provider's key survives resolution.

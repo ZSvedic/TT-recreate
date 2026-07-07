@@ -90,6 +90,13 @@ Feature: Model config
       When resolveConfig is called with stored provider "openai" and cellModel "claude-haiku-4-5"
       Then the resolved cellModel is "gpt-5.4-mini"
 
+    @headless
+    # Rule 7: the final primary model must belong to the resolved provider.
+    Scenario: A cross-provider stored model is coerced to the provider default
+      When resolveConfig is called with stored provider "openai" and model "claude-sonnet-4-6"
+      Then the resolved model is "gpt-5.5"
+      And the resolved cellModel is "gpt-5.4-mini"
+
   Rule: providerFor
 
     @headless
