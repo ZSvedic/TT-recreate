@@ -7,9 +7,10 @@ import {
   applyJsonPatch, validateTablePlan, runTransformations, SqlEngine, loadTable, readTableFile, writeRows,
   type ChunkUpdate, type Row, type TablePlan, type Transformation, type CellEvaluator,
 } from '@tamedtable/core';
-import { resolveConfig, keyFor, acceptsTemperature } from '@tamedtable/model-config';
+import { resolveConfig, keyFor, acceptsTemperature, providerFor } from '@tamedtable/model-config';
 import { readConfigFromEnv } from '@tamedtable/model-config/env';
-import { GeminiClient, type FetchLike, type ModelReply } from './client.ts';
+import { clientFor, type FetchLike, type ModelReply } from './client.ts';
+import { RateLimiter } from './rpm.ts';
 import { SYSTEM_PROMPT, BATCH_SYSTEM_PROMPT, PYTHON_EXPORT_PROMPT } from './prompts.ts';
 
 export { SYSTEM_PROMPT, BATCH_SYSTEM_PROMPT, CELL_FORMAT_CONSTRAINT, PYTHON_EXPORT_PROMPT, VOICE_PROMPT } from './prompts.ts';
@@ -170,7 +171,14 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions = {}): Runner &
   const chunkSize = opts.chunkSize ?? Number(process.env.TAMEDTABLE_CHUNK_SIZE ?? 5);
   const recoveryBudget = opts.recoveryBudget ?? 3;
   const cwd = opts.cwd ?? process.cwd();
-  const client = new GeminiClient({ apiKey, baseURL: opts.baseURL, fetch: opts.fetch, maxRetries: opts.maxRetries });
+  const provider = providerFor(model);
+  const baseURL = opts.baseURL
+    ?? (provider === 'anthropic' ? process.env.ANTHROPIC_BASE_URL : undefined);
+  const rpm = opts.rpm ?? Number(process.env.TAMEDTABLE_RPM ?? 40);
+  const client = clientFor(provider, {
+    apiKey, baseURL, fetch: opts.fetch, maxRetries: opts.maxRetries,
+    limiter: new RateLimiter(Number.isFinite(rpm) ? rpm : 40),
+  });
 
   let spec: TablePlan | null = null;
   let sourceRows: Row[] | null = null;

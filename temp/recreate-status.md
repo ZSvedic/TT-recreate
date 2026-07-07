@@ -1,6 +1,6 @@
 # Recreation status — 2026-07-07 (session 5: close all remaining gaps)
 
-Progress: **0 of 21 checklist items green** (audit = item 0, done below).
+Progress: **3 of 21 checklist items green** (tasks 1-3: key persistence, Anthropic/OpenAI clients, RPM).
 
 ## Task 0 — spec-vs-implementation audit (done)
 
@@ -13,10 +13,10 @@ marked *decision*, not gaps.
 
 | Spec claim | Implemented? | Tested? | Task |
 |---|---|---|---|
-| model-config `storage.ts` (StoragePort over localStorage, `tamedtable.config`, `tamedtable.apiKey` migration); controller boots via `resolveConfig(env, stored)`; demo shared persistence | no | no | 1 |
+| model-config `storage.ts` (StoragePort over localStorage, `tamedtable.config`, `tamedtable.apiKey` migration); controller boots via `resolveConfig(env, stored)`; demo shared persistence | **yes** | **yes** | 1 ✅ |
 | resolveConfig rule 7: cross-provider primary model coerced to `defaultModel(provider)` | no | no | 17 |
-| Anthropic + OpenAI live HTTP clients (patch turn, cells, generateText; provider auth headers; error mapping) | no (Gemini only) | no | 2 |
-| `TAMEDTABLE_RPM` enforced on live calls | no (accepted only) | no | 3 |
+| Anthropic + OpenAI live HTTP clients (patch turn, cells, generateText; provider auth headers; error mapping) | **yes** | **yes** | 2 ✅ |
+| `TAMEDTABLE_RPM` enforced on live calls | **yes** | **yes** | 3 ✅ |
 | models.json two sections (`models` + `defaults`), per-model prices mirroring `benchmarks/models.jsonl`, `DEFAULTS` export | no (flat array, no prices) | partial | 4 |
 | Settings: per-row per-Mtok price, per-card env hint under key field, byok/change-models help links, role explainer/intro copy | no | no | 4 |
 | Chat: "Loaded \<file\> — N rows, M columns." note; header "N transformation(s)"; request-detail panel wired in shell | no (component exists, shell passes no debug) | no | 5 |

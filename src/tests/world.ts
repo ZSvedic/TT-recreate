@@ -52,6 +52,7 @@ export class TTWorld extends CucumberWorld {
   recorder: ReturnType<typeof makeRecorder> | null = null;
   controller: WebController | null = null;
   capturedApiKey: string | null = null;
+  capturedRequest: { url: string; headers: Record<string, string>; body: string } | null = null;
   fsAccess = true;
   /** Injected StoragePort + env override for the key-persistence scenarios. */
   storagePort: StoragePort | null = null;
