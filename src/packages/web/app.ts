@@ -302,7 +302,32 @@ function renderSettings(): HTMLElement {
   const hint = el('p', 'margin:10px 0 0;font-size:11.5px;line-height:1.5;color:var(--uk-ink3)',
     'Bring your own key — it stays in this browser, never on a server.');
   body.appendChild(hint);
+  if (isMobile()) body.appendChild(renderA2hs());
   return wrap;
+}
+
+// Add to home screen (phone Settings only, behavior.md #WebUI): the install
+// prompt where the browser offers one, share-menu instructions elsewhere.
+let installPrompt: (Event & { prompt(): Promise<void> }) | null = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e as Event & { prompt(): Promise<void> };
+});
+
+function renderA2hs(): HTMLElement {
+  const sec = el('div', 'margin-top:20px;padding-top:14px;border-top:1px solid var(--uk-line)');
+  sec.setAttribute('data-a2hs', '');
+  sec.appendChild(el('div', 'font-size:11.5px;font-weight:600;letter-spacing:0.6px;' +
+    'text-transform:uppercase;color:var(--uk-ink3);margin-bottom:8px', 'Add to home screen'));
+  sec.appendChild(el('p', 'margin:0 0 10px;font-size:12.5px;line-height:1.5;color:var(--uk-ink2)',
+    'Opened from a home-screen icon the app runs full-screen, with no browser bars at all.'));
+  if (installPrompt) {
+    sec.appendChild(btn('Install app', BTN_PRIMARY, () => void installPrompt!.prompt(), { 'data-a2hs-install': '' }));
+  } else {
+    sec.appendChild(el('p', 'margin:0;font-size:12.5px;line-height:1.6;color:var(--uk-ink3)',
+      'Open your browser\u2019s share menu and choose \u201cAdd to Home Screen\u201d.'));
+  }
+  return sec;
 }
 
 function renderTours(): HTMLElement {
@@ -441,6 +466,7 @@ function renderTable(target: HTMLElement): void {
     onReorderColumns: (order) => void act(() => controller.reorderColumnFirst(order[0]!))(),
     streaming: false,
     status: controller.activityStatus(),
+    pageScroll: isMobile() ? { headerTop: 40 } : undefined,
   });
 }
 
@@ -533,7 +559,8 @@ const DOCK_ICONS = {
 
 /** Bottom sheet frame that takes the dock's place; the table stays above it. */
 function mobileSheetFrame(title: string): { frame: HTMLElement; body: HTMLElement } {
-  const frame = el('div', 'flex:0 0 auto;height:300px;display:flex;flex-direction:column;' +
+  const frame = el('div', 'position:fixed;bottom:0;left:0;right:0;z-index:60;height:300px;' +
+    'display:flex;flex-direction:column;' +
     'background:var(--uk-surface);border-top:1px solid var(--uk-line)');
   frame.className = 'uk-sheet';
   frame.setAttribute('data-mobile-sheet', title.toLowerCase());
@@ -687,7 +714,8 @@ function renderMobile(): void {
   const loaded = controller.hasTableLoaded();
 
   // App bar: brand mark, file name, page/total pager.
-  const bar = el('div', 'height:40px;flex:0 0 auto;display:flex;align-items:center;gap:10px;' +
+  const bar = el('div', 'position:fixed;top:0;left:0;right:0;z-index:60;height:40px;' +
+    'display:flex;align-items:center;gap:10px;' +
     'padding:0 12px;background:var(--uk-surface);border-bottom:1px solid var(--uk-line)');
   bar.setAttribute('data-appbar', '');
   const brand = el('span', 'display:inline-flex;align-items:center;gap:5px');
@@ -713,8 +741,8 @@ function renderMobile(): void {
   }
   app.appendChild(bar);
 
-  // Table (or the empty pane) fills the middle.
-  const main = el('div', 'flex:1;display:flex;flex-direction:column;min-height:0');
+  // Table (or the empty pane) fills the middle; the page scrolls it.
+  const main = el('div', 'flex:1;display:flex;flex-direction:column');
   renderTable(main);
   app.appendChild(main);
 
@@ -723,7 +751,8 @@ function renderMobile(): void {
   else if (mobileSheet === 'type') app.appendChild(renderTypeSheet());
   else if (mobileSheet === 'speak') app.appendChild(renderSpeakSheet());
   else {
-    const dock = el('div', 'flex:0 0 auto;height:80px;display:flex;align-items:center;' +
+    const dock = el('div', 'position:fixed;bottom:0;left:0;right:0;z-index:60;height:80px;' +
+      'display:flex;align-items:center;' +
       'justify-content:space-around;background:var(--uk-dockBg);color:var(--uk-dockInk);' +
       'border-top:1px solid var(--uk-dockBorder)');
     dock.setAttribute('data-dock-bar', '');
@@ -746,8 +775,14 @@ const dialogHost = el('div');
 
 function render(): void {
   app.innerHTML = '';
-  app.style.cssText = 'height:100vh;display:flex;flex-direction:column;' +
-    'overflow:hidden;background:var(--uk-bg);color:var(--uk-ink)';
+  // Desktop: fixed to the window, nothing scrolls the page. Phone: the page
+  // itself scrolls the table (app bar + dock pinned), with a scroll-room
+  // floor so browser bars can always be swiped away (behavior.md #WebUI).
+  app.style.cssText = isMobile()
+    ? 'min-height:calc(100dvh + 56px);display:flex;flex-direction:column;' +
+      'padding:40px 0 80px;background:var(--uk-bg);color:var(--uk-ink)'
+    : 'height:100vh;display:flex;flex-direction:column;' +
+      'overflow:hidden;background:var(--uk-bg);color:var(--uk-ink)';
 
   // A phone tour's query step raises the Type sheet so the spotlight lands
   // on the visible composer (behavior.md #TutorialMode).

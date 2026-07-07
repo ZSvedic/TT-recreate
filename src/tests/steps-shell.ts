@@ -59,6 +59,8 @@ async function openApp(viewport: { width: number; height: number }): Promise<voi
   context = await browser.newContext({ viewport });
   page = await context.newPage();
   (page as Page & { __base?: string }).__base = `http://localhost:${port}/`;
+  await page.goto(`http://localhost:${port}/`);
+  await page.waitForSelector('#app > *', { timeout: 15_000 });
 }
 
 AfterAll(async () => {
@@ -136,4 +138,74 @@ Then('the browser chat input is prefilled with {string}', async (text: string) =
 
 Then('the mobile Type sheet is raised', async () => {
   await page.waitForSelector('[data-mobile-sheet="type a request"]', { timeout: 10_000 });
+});
+
+// ---------- mobile page-as-scroller + Add to home screen ----------
+
+When('the browser user opens the sample {string}', async (name: string) => {
+  await page.goto(`${(page as Page & { __base?: string }).__base}`);
+  await page.click('[data-empty-open]');
+  await page.click(`[data-tb-sample="${name}"]`);
+  await page.waitForSelector('[data-tv-cell]', { timeout: 15_000 });
+});
+
+Then('the page has vertical scroll room', async () => {
+  const room = await page.evaluate(() =>
+    (document.scrollingElement?.scrollHeight ?? 0) - window.innerHeight);
+  assert.ok(room >= 40, `scroll room was ${room}px`);
+});
+
+Then('the page has no vertical scroll room', async () => {
+  const room = await page.evaluate(() =>
+    (document.scrollingElement?.scrollHeight ?? 0) - window.innerHeight);
+  assert.ok(room <= 0, `unexpected scroll room: ${room}px`);
+});
+
+Then('the table region does not scroll internally', async () => {
+  const overflow = await page.locator('[data-tv-scroller]')
+    .evaluate((el) => getComputedStyle(el).overflowY);
+  assert.equal(overflow, 'visible');
+});
+
+Then('the app bar is pinned', async () => {
+  assert.equal(await page.locator('[data-appbar]').evaluate((el) => getComputedStyle(el).position), 'fixed');
+});
+
+Then('the dock is pinned', async () => {
+  assert.equal(await page.locator('[data-dock-bar]').evaluate((el) => getComputedStyle(el).position), 'fixed');
+});
+
+Then('the table header row sticks below the app bar', async () => {
+  const style = await page.locator('[data-tv-header]').first()
+    .evaluate((el) => ({ position: getComputedStyle(el).position, top: getComputedStyle(el).top }));
+  assert.equal(style.position, 'sticky');
+  assert.equal(style.top, '40px');
+});
+
+Then('the row-index column sticks to the left edge', async () => {
+  const style = await page.locator('[data-tv-index]').first()
+    .evaluate((el) => ({ position: getComputedStyle(el).position, left: getComputedStyle(el).left }));
+  assert.equal(style.position, 'sticky');
+  assert.equal(style.left, '0px');
+});
+
+When('the browser user opens Settings from the dock menu', async () => {
+  await page.goto(`${(page as Page & { __base?: string }).__base}`);
+  await page.click('[data-dock="menu"]');
+  await page.click('[data-mobile-menu] button:has-text("Settings")');
+  await page.waitForSelector('[data-mc-card]', { timeout: 10_000 });
+});
+
+When('the browser user opens Settings from the toolbar', async () => {
+  await page.goto(`${(page as Page & { __base?: string }).__base}`);
+  await page.click('[data-tb-action="Settings"]');
+  await page.waitForSelector('[data-mc-card]', { timeout: 10_000 });
+});
+
+Then('the Add to home screen section is shown', async () => {
+  assert.equal(await page.locator('[data-a2hs]').count(), 1);
+});
+
+Then('the Add to home screen section is absent', async () => {
+  assert.equal(await page.locator('[data-a2hs]').count(), 0);
 });

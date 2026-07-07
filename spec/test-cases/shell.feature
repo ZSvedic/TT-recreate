@@ -32,3 +32,41 @@ Feature: Browser shell
       When the user clicks the tour Next button
       Then the mobile Type sheet is raised
       And the tour spotlight targets the mobile composer
+
+  Rule: On a phone the page scrolls the table under pinned chrome
+
+    @web
+    Scenario: The phone page is the table's scroller with frozen header and index
+      Given the built web app in a browser at 390x844
+      When the browser user opens the sample "paginate-input.csv"
+      Then the page has vertical scroll room
+      And the table region does not scroll internally
+      And the app bar is pinned
+      And the dock is pinned
+      And the table header row sticks below the app bar
+      And the row-index column sticks to the left edge
+
+    @web
+    Scenario: Even the empty phone page keeps a bar's worth of scroll room
+      Given the built web app in a browser at 390x844
+      Then the page has vertical scroll room
+
+    @web
+    Scenario: On desktop nothing scrolls the page
+      Given the built web app in a browser
+      When the browser user opens the sample "paginate-input.csv"
+      Then the page has no vertical scroll room
+
+  Rule: Add to home screen lives in phone Settings only
+
+    @web
+    Scenario: Phone Settings ends with the Add-to-home-screen section
+      Given the built web app in a browser at 390x844
+      When the browser user opens Settings from the dock menu
+      Then the Add to home screen section is shown
+
+    @web
+    Scenario: Desktop Settings has no Add-to-home-screen section
+      Given the built web app in a browser
+      When the browser user opens Settings from the toolbar
+      Then the Add to home screen section is absent
