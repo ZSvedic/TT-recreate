@@ -418,11 +418,21 @@ function renderEmptyPane(target: HTMLElement): void {
     'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M8 10V3 M5 6l3-3 3 3 M2.5 11.5v1A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-1"/></svg>';
   pane.appendChild(iconWrap);
-  pane.appendChild(el('div', 'font-size:14px;font-weight:500;color:var(--uk-ink2)', 'Drop a CSV or JSONL file here'));
-  pane.appendChild(el('div', 'font-size:12.5px;color:var(--uk-ink3)', 'or load one from the toolbar'));
-  const open = btn('Open sample…', BTN_CHROME + 'margin-top:4px', act(() => controller.openSamplePicker()),
-    { 'data-empty-open': '' });
-  pane.appendChild(open);
+  pane.appendChild(el('div', 'font-size:15px;font-weight:600;color:var(--uk-ink)', 'What table can I tame?'));
+  const stack = el('div', 'display:flex;flex-direction:column;gap:8px;margin-top:4px;min-width:180px');
+  stack.appendChild(btn('Open sample…', BTN_CHROME + 'justify-content:center',
+    act(() => controller.openSamplePicker()), { 'data-empty-open': '' }));
+  stack.appendChild(btn('Open local…', BTN_CHROME + 'justify-content:center', () => openLocalFile(),
+    { 'data-empty-local': '' }));
+  stack.appendChild(btn('Open URL…', BTN_CHROME + 'justify-content:center',
+    act(() => controller.openUrlDialog()), { 'data-empty-url': '' }));
+  pane.appendChild(stack);
+  const tours = el('a', 'margin-top:6px;font-size:12.5px;color:var(--uk-accent);cursor:pointer;' +
+    'text-decoration:underline', 'Or start one of the tours');
+  tours.setAttribute('data-empty-tours', '');
+  tours.addEventListener('click', () => void act(() => { toursOpen = true; controller.openTutorial(); })());
+  pane.appendChild(tours);
+  pane.appendChild(el('div', 'font-size:11.5px;color:var(--uk-ink4)', 'or drop a CSV / JSONL file here'));
   pane.addEventListener('dragover', (e) => {
     e.preventDefault();
     pane.style.outline = '2px dashed var(--uk-accent)';
@@ -827,8 +837,11 @@ function render(): void {
     saveDataMenu: [
       { label: 'Save as CSV…', onClick: () => void act(() => controller.say('save as csv'))() },
       { label: 'Save as JSONL…', onClick: () => void act(() => controller.say('save as jsonl'))() },
+      { label: 'Save as Parquet…', onClick: () => void act(() => controller.say('save as parquet'))() },
+      { label: 'Save as Arrow…', onClick: () => void act(() => controller.say('save as arrow'))() },
     ],
     saveFlowMenu: [
+      { label: 'Save as Flow…', onClick: () => void act(() => controller.say('save flow'))() },
       { label: 'Save as Python…', onClick: () => void act(() => controller.say('save as python'))() },
     ],
   });
@@ -866,7 +879,12 @@ function renderDialogLayer(): void {
     dialogHost.appendChild(host);
     mountUrlDialog(host, {
       open: true,
-      onSubmit: (url) => void act(() => controller.loadFromUrl(url))(),
+      // Failures render inline in the dialog (no toast, stays open); success
+      // closes it via loadFromUrl and re-renders.
+      onSubmit: async (url) => {
+        await controller.loadFromUrl(url);
+        render();
+      },
       onClose: () => void act(() => controller.closeUrlDialog())(),
     });
   }

@@ -206,6 +206,77 @@ Then('the Add to home screen section is shown', async () => {
   assert.equal(await page.locator('[data-a2hs]').count(), 1);
 });
 
+// ---------- empty page / tooltips / save menus / URL dialog ----------
+
+Then('the empty page shows {string}', async (text: string) => {
+  const content = await page.textContent('[data-empty-state]');
+  assert.ok(content?.includes(text), `empty page read: ${content?.slice(0, 200)}`);
+});
+
+Then('the empty page offers the buttons {string}, {string} and {string}', async (a: string, b: string, c: string) => {
+  for (const label of [a, b, c]) {
+    assert.ok(await page.locator(`[data-empty-state] button:has-text("${label}")`).count() >= 1,
+      `no empty-page button "${label}"`);
+  }
+});
+
+Then('the empty page links {string}', async (text: string) => {
+  assert.ok(await page.locator(`[data-empty-tours]:has-text("${text}")`).count() === 1);
+});
+
+When('the browser user clicks the empty-page tours link', async () => {
+  await page.click('[data-empty-tours]');
+});
+
+Then('the toolbar button {string} has the tooltip {string}', async (label: string, tooltip: string) => {
+  assert.equal(await page.getAttribute(`[data-tb-action="${label}"]`, 'title'), tooltip);
+});
+
+Then(/^the "(save-data|save-flow)" menu lists (.+)$/, async (key: string, list: string) => {
+  await page.click(`[data-tb-menu-toggle="${key}"]`);
+  for (const m of list.matchAll(/"([^"]+)"/g)) {
+    assert.ok(await page.locator(`[data-tb-menu="${key}"] [data-tb-menu-item="${m[1]}"]`).count() === 1,
+      `menu ${key} missing "${m[1]}"`);
+  }
+  await page.click(`[data-tb-menu-toggle="${key}"]`);
+});
+
+When('the browser user opens the URL dialog', async () => {
+  await page.click('[data-tb-menu-toggle="open"]');
+  await page.click('[data-tb-menu-item="Open URL…"]');
+  await page.waitForSelector('[data-tb-url-input]', { timeout: 10_000 });
+});
+
+When('the browser user submits the URL {string}', async (url: string) => {
+  await page.fill('[data-tb-url-input]', url);
+  await page.click('[data-tb-url-submit]');
+});
+
+When('the browser user types the URL {string}', async (url: string) => {
+  await page.fill('[data-tb-url-input]', url);
+  await page.dispatchEvent('[data-tb-url-input]', 'input');
+});
+
+Then('the URL dialog shows an inline error', async () => {
+  await page.waitForFunction(
+    () => (document.querySelector('[data-tb-url-error]')?.textContent ?? '').length > 0,
+    undefined, { timeout: 15_000 },
+  );
+});
+
+Then('the URL dialog is still open', async () => {
+  assert.equal(await page.locator('[data-tb-url-input]').count(), 1);
+});
+
+Then('no browser toast is shown', async () => {
+  assert.equal(await page.locator('[data-uk-toast]').count(), 0);
+});
+
+Then('the URL dialog shows an unencrypted hint', async () => {
+  const note = await page.textContent('[data-tb-url-note]');
+  assert.ok(note && /unencrypted/i.test(note), `note was: ${note}`);
+});
+
 Then('the Add to home screen section is absent', async () => {
   assert.equal(await page.locator('[data-a2hs]').count(), 0);
 });

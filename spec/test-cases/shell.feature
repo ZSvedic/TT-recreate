@@ -57,6 +57,54 @@ Feature: Browser shell
       When the browser user opens the sample "paginate-input.csv"
       Then the page has no vertical scroll room
 
+  Rule: The empty page offers every open path
+
+    @web
+    Scenario: The empty page asks the question and stacks the three open actions
+      Given the built web app in a browser
+      Then the empty page shows "What table can I tame?"
+      And the empty page offers the buttons "Open sample…", "Open local…" and "Open URL…"
+      And the empty page links "Or start one of the tours"
+      When the browser user clicks the empty-page tours link
+      Then the tours panel is open in the browser
+
+  Rule: Toolbar tooltips name their CLI equivalents
+
+    @web
+    Scenario: Undo, Redo and the saves carry CLI-equivalent tooltips
+      Given the built web app in a browser
+      Then the toolbar button "Undo" has the tooltip "Undo (:undo)"
+      And the toolbar button "Redo" has the tooltip "Redo (:redo)"
+      And the toolbar button "Save data" has the tooltip "Save the current rows (:save)"
+      And the toolbar button "Save flow" has the tooltip "Save the flow as a replayable .flow file (:save-flow)"
+
+  Rule: The save split-buttons list every format
+
+    @web
+    Scenario: Save data offers all four formats and Save flow offers Flow and Python
+      Given the built web app in a browser
+      When the browser user opens the sample "customers-input.csv"
+      Then the "save-data" menu lists "Save as CSV…", "Save as JSONL…", "Save as Parquet…", "Save as Arrow…"
+      And the "save-flow" menu lists "Save as Flow…", "Save as Python…"
+
+  Rule: The URL dialog reports failures inline
+
+    @web
+    Scenario: A failing URL shows an inline error and the dialog stays open
+      Given the built web app in a browser
+      When the browser user opens the URL dialog
+      And the browser user submits the URL "https://localhost:1/missing.csv"
+      Then the URL dialog shows an inline error
+      And the URL dialog is still open
+      And no browser toast is shown
+
+    @web
+    Scenario: An http URL shows a soft unencrypted hint
+      Given the built web app in a browser
+      When the browser user opens the URL dialog
+      And the browser user types the URL "http://example.com/data.csv"
+      Then the URL dialog shows an unencrypted hint
+
   Rule: Add to home screen lives in phone Settings only
 
     @web

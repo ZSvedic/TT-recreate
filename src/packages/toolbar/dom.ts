@@ -104,10 +104,10 @@ const BTN_CSS = 'height:28px;padding:0 10px;display:inline-flex;align-items:cent
   'line-height:1;white-space:nowrap;cursor:pointer';
 
 function button(label: string, iconName: string | null, disabled: boolean,
-  onClick: () => void, condensed = false): HTMLButtonElement {
+  onClick: () => void, condensed = false, tooltip?: string): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.setAttribute('data-tb-action', label);
-  btn.title = label;
+  btn.title = tooltip ?? label;
   btn.style.cssText = BTN_CSS + (disabled ? ';opacity:0.4;cursor:default' : '');
   if (iconName) btn.appendChild(icon(iconName));
   if (!condensed || !iconName) btn.appendChild(document.createTextNode(label));
@@ -125,10 +125,11 @@ function splitButton(
   onPrimary: () => void,
   menu: ToolbarMenuItem[],
   condensed = false,
+  tooltip?: string,
 ): HTMLElement {
   const wrap = document.createElement('span');
   wrap.style.cssText = 'position:relative;display:inline-flex;align-items:center;border-radius:4px';
-  const main = button(label, iconName, disabled, onPrimary, condensed);
+  const main = button(label, iconName, disabled, onPrimary, condensed, tooltip);
   main.style.borderTopRightRadius = '0';
   main.style.borderBottomRightRadius = '0';
   main.style.paddingRight = '4px';
@@ -212,11 +213,13 @@ export function mountToolbar(container: HTMLElement, p: ToolbarProps): void {
     { label: 'Open local…', onClick: p.onOpenLocal },
     { label: 'Open URL…', onClick: p.onOpenUrl },
   ], c));
-  bar.appendChild(splitButton('save-data', 'Save data', 'save', gate || !p.loaded, p.onSaveData, p.saveDataMenu, c));
-  bar.appendChild(splitButton('save-flow', 'Save flow', 'flow', gate || !p.loaded, p.onSaveFlow, p.saveFlowMenu, c));
+  bar.appendChild(splitButton('save-data', 'Save data', 'save', gate || !p.loaded, p.onSaveData, p.saveDataMenu, c,
+    'Save the current rows (:save)'));
+  bar.appendChild(splitButton('save-flow', 'Save flow', 'flow', gate || !p.loaded, p.onSaveFlow, p.saveFlowMenu, c,
+    'Save the flow as a replayable .flow file (:save-flow)'));
   bar.appendChild(divider());
-  bar.appendChild(button('Undo', 'undo', gate || !p.canUndo, p.onUndo, c));
-  bar.appendChild(button('Redo', 'redo', gate || !p.canRedo, p.onRedo, c));
+  bar.appendChild(button('Undo', 'undo', gate || !p.canUndo, p.onUndo, c, 'Undo (:undo)'));
+  bar.appendChild(button('Redo', 'redo', gate || !p.canRedo, p.onRedo, c, 'Redo (:redo)'));
   bar.appendChild(divider());
   const theme = document.createElement('button');
   theme.setAttribute('data-tb-theme', '');
@@ -261,7 +264,8 @@ function dialogHeader(title: string, onClose: () => void): HTMLElement {
 
 export interface UrlDialogProps {
   open: boolean;
-  onSubmit: (url: string) => void;
+  /** A rejection renders inline (data-tb-url-error); the dialog stays open. */
+  onSubmit: (url: string) => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -291,11 +295,34 @@ export function mountUrlDialog(container: HTMLElement, p: UrlDialogProps): void 
   input.style.cssText = 'width:100%;box-sizing:border-box;padding:8px 10px;' +
     'border:1px solid var(--tb-line2,#c9c9c9);border-radius:6px;background:var(--tb-surface2,#fafafa);' +
     'font-family:var(--tb-font-mono,monospace);font-size:12.5px;color:var(--tb-ink,#281C60);outline:none';
+  const note = document.createElement('div');
+  note.setAttribute('data-tb-url-note', '');
+  note.style.cssText = 'font-size:11.5px;line-height:1.5;color:var(--tb-ink3,#6d6491);display:none';
+  note.textContent = 'http:// is unencrypted — the file travels in the clear.';
+  const error = document.createElement('div');
+  error.setAttribute('data-tb-url-error', '');
+  error.style.cssText = 'font-size:11.5px;line-height:1.5;color:var(--tb-err,#B3261E);display:none';
+  const syncNote = () => {
+    note.style.display = /^http:\/\//i.test(input.value.trim()) ? 'block' : 'none';
+  };
+  const submit = async () => {
+    error.style.display = 'none';
+    error.textContent = '';
+    try {
+      await p.onSubmit(input.value);
+    } catch (e) {
+      error.textContent = (e as Error).message;
+      error.style.display = 'block';
+    }
+  };
+  input.addEventListener('input', syncNote);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') p.onClose();
-    if (e.key === 'Enter') p.onSubmit(input.value);
+    if (e.key === 'Enter') void submit();
   });
   body.appendChild(input);
+  body.appendChild(note);
+  body.appendChild(error);
   dialog.appendChild(body);
 
   const foot = document.createElement('div');
@@ -312,7 +339,7 @@ export function mountUrlDialog(container: HTMLElement, p: UrlDialogProps): void 
   load.textContent = 'Load';
   load.style.cssText = BTN_CSS + ';background:var(--tb-ink,#281C60);color:var(--tb-ink-on-ink,#fff);' +
     'border-color:var(--tb-ink,#281C60);font-weight:600';
-  load.addEventListener('click', () => p.onSubmit(input.value));
+  load.addEventListener('click', () => void submit());
   foot.appendChild(load);
   dialog.appendChild(foot);
 
