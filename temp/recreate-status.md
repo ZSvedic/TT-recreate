@@ -1,70 +1,50 @@
-# Recreation status — 2026-07-05 (session 4: design parity, mobile, history, smoke)
+# Recreation status — 2026-07-07 (session 5: close all remaining gaps)
 
-## Done (green, offline, no API key)
+Progress: **3 of 21 checklist items green** (tasks 1-3: key persistence, Anthropic/OpenAI clients, RPM).
 
-`cd src && bun run test` runs four gates, all green:
+## Task 0 — spec-vs-implementation audit (done)
 
-| Gate | Result |
-|---|---|
-| `bun test packages` (unit) | 7 pass |
-| Cucumber `@headless` | **163 scenarios passed** |
-| Cucumber `@cli` | **116 scenarios passed** |
-| Cucumber `@web` (full: app + package demos) | **187 scenarios passed** |
+Method: every `spec/packages/*/behavior.md`, every `spec/behavior.md` section,
+and every `spec/code-contract.md` claim diffed against `src/` and the test
+suite. Claims that match a deliberate logged decision in `temp/decisions.md`
+(plain-DOM instead of React, `Bun.build` instead of Vite, hand-rolled
+Zod / fast-json-patch / AI-SDK substitutes, content-matched cassettes) are
+marked *decision*, not gaps.
 
-Sessions 1–3 built the engine, CLI, `WebController`, package demos, the
-plain-DOM shell, and the Pages deploy (see git history). Session 4 added:
+| Spec claim | Implemented? | Tested? | Task |
+|---|---|---|---|
+| model-config `storage.ts` (StoragePort over localStorage, `tamedtable.config`, `tamedtable.apiKey` migration); controller boots via `resolveConfig(env, stored)`; demo shared persistence | **yes** | **yes** | 1 ✅ |
+| resolveConfig rule 7: cross-provider primary model coerced to `defaultModel(provider)` | no | no | 17 |
+| Anthropic + OpenAI live HTTP clients (patch turn, cells, generateText; provider auth headers; error mapping) | **yes** | **yes** | 2 ✅ |
+| `TAMEDTABLE_RPM` enforced on live calls | **yes** | **yes** | 3 ✅ |
+| models.json two sections (`models` + `defaults`), per-model prices mirroring `benchmarks/models.jsonl`, `DEFAULTS` export | no (flat array, no prices) | partial | 4 |
+| Settings: per-row per-Mtok price, per-card env hint under key field, byok/change-models help links, role explainer/intro copy | no | no | 4 |
+| Chat: "Loaded \<file\> — N rows, M columns." note; header "N transformation(s)"; request-detail panel wired in shell | no (component exists, shell passes no debug) | no | 5 |
+| Tour spotlights: Driver.js-style overlay per anchor, "Voilà" terminal step, mobile Type-sheet auto-raise; gherkin-tour `TourUi` (`./ui`), `TourCursor`, `TourDriver.cancel/currentStepNumber/stepCount` | no (tour bar only) | no | 6 |
+| Mobile: page-as-scroller, frozen header/index, scroll-room floor, Add-to-home-screen Settings section | no (table region scrolls) | no | 7 |
+| Voice: 30 s auto-send cap; continuous hands-free toggle in shell; Esc paths in shell | no (controller surface only) | partial | 8 |
+| Voice recording converted to 16 kHz WAV before send | no (raw webm/mp4) | no | 8/14 |
+| voice-input package: `browser-voice` entry (browserVoicePort), `audioMediaType`, `ContinuousVoicePort` + `browser-vad` entry, `VOICE_INSTRUCTION` drift guard, demo capability panel | no (port lives in web/, no VAD) | no | 14 |
+| Browser `{sql}`/parquet/arrow via duckdb-wasm | no (stub throws) | no | 9 |
+| Link check workflow green | failing since Jul 3 | — | 10 |
+| pr-preview coexists with Actions-flow deploy | no (predates it) | — | 11 |
+| bench package `@tamedtable/bench` (pricing table test, sweep runner, charts) | no | no | 12 |
+| Cassettes replay on strict fingerprints without content matcher | no (matcher required) | — | 13 |
+| file-io: `parseTable`, `FilePort`/`SaveOutcome`, `BrowserFilePort` (`browser-fs`), `loadCodec` load-on-demand | no | no | 15 |
+| ui-kit: toast `action`/`onAction`, `space` export; spec names (`brand`, `toastDurationMs`, `TOAST_FLOOR_MS`/`TOAST_CEILING_MS`, `TYPING_MS_PER_CHAR`, `sampleKind`, `buildPageList`, `pageSlice` arg order, `controller-diagnostics.ts`) | no / renamed | partial | 16 |
+| CLI `execute` writes parquet/arrow output (codecs support it; CLI exits 4) | no | no | 17 |
+| Empty page: mark, "What table can I tame?", three open buttons, "Or start one of the tours" (desktop + phone) | no (drop-zone copy) | no | 18 |
+| Toolbar tooltips name CLI equivalents (`Undo (:undo)` …) | no | no | 18 |
+| Save data dropdown: one "Save as …" per supported format; Save flow dropdown: "Save as Flow…" entry | partial (CSV/JSONL only; no Save-as-Flow) | partial | 18 |
+| Diagnostics actions rendered in Settings; error-toast "Copy report" action | no (logic tested, UI absent) | partial | 19 |
+| URL dialog: inline errors, stays open, no toast; `http://` unencrypted hint | no (toast path) | partial | 20 |
+| Everything else in behavior.md / code-contract / package specs (data model, engine, CLI, formats, diagnostics logic, tutorial replay, pagination, history, settings accordion, toasts, demos) | yes | yes | — |
 
-- **Design parity with `marketing/claude-design-app`** — the shell
-  (`src/packages/web/app.ts`) now composes the package `dom.ts` components
-  (toolbar, table-view, chat-panel, model-config, ui-kit toasts), all
-  restyled to the prototype and themed from `tokens.json` via namespaced CSS
-  variables (`paintTheme()` in app.ts). Light/dark toggle persists under
-  `localStorage["tamedtable.theme"]`; ui-kit grew `createThemeToggle`; toasts
-  auto-fade with hover-pause (ui-kit `mountToasts`). Toolbar condenses below
-  1100 px. Settings and Tours are right-hand sheets; the Open-from-URL and
-  sample dialogs are prototype-styled toolbar components.
-- **History timeline** — `WebController` keeps a cursor journal (baseline
-  `Loaded <file>` + a labelled snapshot per chat/voice/edit/reorder turn)
-  with `undo`/`redo`/`jumpTo`/`historyLabels`/`historyTimes`/`historyCursor`;
-  pinned by five `web.feature` scenarios (spec-first, red → green). Desktop
-  toolbar Redo works.
-- **Mobile dock layout** (≤768 px per behavior.md): app bar with pager, the
-  five-button dark dock (Menu · Undo · History · Type · Speak), bottom sheets
-  for Type / Speak / History (the undo timeline: newest first, current
-  highlighted, tap-to-jump), a left Menu drawer, full-width sheets.
-- **Live mic** — `browserVoicePort()` (MediaRecorder behind feature-detect)
-  wired to the chat mic button and the mobile Speak sheet; shows only when
-  `micVisible()` (voice-capable model + key). Voice tours still replay clips.
-- **`test:smoke`** — `src/tests/smoke.ts` serves the built site under
-  `/TT-recreate/` and checks in headless Chromium: homepage, every demo
-  page's `#out`, and the filter-tour deep link finishing with 4 rows.
-  `deploy.yml` runs it between build and upload.
+Checklist (M = 21): tasks 1–13 from the mission plus audit tasks 14–20,
+final gate. Each goes red → green with its own timebox; this table is
+updated at every PR.
 
-Site is live at <https://zsvedic.github.io/TT-recreate/> (Actions Pages flow,
-auto on push to main).
+## Session-4 state (unchanged baseline)
 
-## Remaining
-
-- `pr-preview.yml` predates the Actions-flow deploy and needs rework before
-  PR previews return.
-- `bench` package; `test:e2e` (the Cucumber `@web` profile + `test:smoke`
-  cover the browser today).
-- Mobile refinements from behavior.md not implemented: the page-as-scroller
-  with frozen header/index column (the table region scrolls instead, with
-  the desktop pagination/status footers), tour spotlights (steps show in the
-  tour bar; the Type sheet is not auto-raised for chat steps), the
-  Add-to-home-screen Settings section, the 30-second auto-send voice cap,
-  continuous voice UI (the controller surface exists).
-- Settings no longer offers per-model switching (model-config's rows are
-  read-only Primary/Secondary readouts); `setModel` remains on the
-  controller.
-- Live (`TAMEDTABLE_CASSETTE=off`) runs wired for Gemini only;
-  `TAMEDTABLE_RPM` accepted but not enforced.
-- SQL/parquet/arrow are unavailable in the browser build (DuckDB is stubbed);
-  sql.feature tours would miss in the browser.
-
-## Open decisions
-
-- Whether to re-record cassettes against this implementation's request bytes
-  (`bun run test:record`, needs `GEMINI_API_KEY`) so strict fingerprint
-  replay works everywhere without the content matcher.
+`cd src && bun run test` green: 7 unit, 163 @headless, 116 @cli, 187 @web.
+Site live at <https://zsvedic.github.io/TT-recreate/>.

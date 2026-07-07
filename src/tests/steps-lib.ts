@@ -219,6 +219,67 @@ Then('the adapter onFinish was called', function (this: TTWorld) {
   assert.ok(this.scratch.onFinishCalled);
 });
 
+// ---------- model-config storage.ts ----------
+
+// Dynamic import so a missing storage.ts fails only these scenarios (red),
+// not the whole suite's module graph.
+const storageModule = () => import('@tamedtable/model-config/storage.ts');
+
+function fakeLocalStorage(seed: Record<string, string> = {}): Storage {
+  const m = new Map(Object.entries(seed));
+  return {
+    getItem: (k: string) => (m.has(k) ? m.get(k)! : null),
+    setItem: (k: string, v: string) => { m.set(k, String(v)); },
+    removeItem: (k: string) => { m.delete(k); },
+    clear: () => m.clear(),
+    key: (i: number) => [...m.keys()][i] ?? null,
+    get length() { return m.size; },
+  } as Storage;
+}
+
+Given('a fake localStorage', function (this: TTWorld) {
+  (globalThis as { localStorage?: Storage }).localStorage = fakeLocalStorage();
+});
+Given('a fake localStorage where {string} is {string}', function (this: TTWorld, k: string, v: string) {
+  (globalThis as { localStorage?: Storage }).localStorage = fakeLocalStorage({ [k]: v });
+});
+Given('no localStorage is available', function (this: TTWorld) {
+  delete (globalThis as { localStorage?: Storage }).localStorage;
+});
+
+When('writeStoredConfig is called with provider {string} and anthropicKey {string}', async function (this: TTWorld, p: string, key: string) {
+  (await storageModule()).writeStoredConfig({ provider: p as Provider, anthropicKey: key });
+});
+When('clearStoredConfig is called', async function (this: TTWorld) {
+  (await storageModule()).clearStoredConfig();
+});
+When('readStoredConfig is called', async function (this: TTWorld) {
+  this.scratch.stored = (await storageModule()).readStoredConfig();
+});
+
+Then('readStoredConfig returns provider {string} and anthropicKey {string}', async function (this: TTWorld, p: string, key: string) {
+  const c = (await storageModule()).readStoredConfig();
+  assert.equal(c.provider, p);
+  assert.equal(c.anthropicKey, key);
+});
+Then('readStoredConfig returns anthropicKey {string}', async function (this: TTWorld, key: string) {
+  const c = (this.scratch.stored as Partial<ResolvedConfig> | undefined) ?? (await storageModule()).readStoredConfig();
+  assert.equal(c.anthropicKey, key);
+});
+Then('readStoredConfig returns an empty config', async function (this: TTWorld) {
+  assert.deepEqual((await storageModule()).readStoredConfig(), {});
+});
+Then(/^the fake localStorage (holds a|has no) "([^"]*)" (?:blob|entry)$/, function (this: TTWorld, wants: string, key: string) {
+  const value = (globalThis as unknown as { localStorage: Storage }).localStorage.getItem(key);
+  if (wants === 'holds a') assert.ok(value, `no ${key} in localStorage`);
+  else assert.equal(value, null, `unexpected ${key} in localStorage: ${value}`);
+});
+Then('writeStoredConfig and clearStoredConfig do not throw', async function (this: TTWorld) {
+  const mod = await storageModule();
+  mod.writeStoredConfig({ provider: 'gemini' });
+  mod.clearStoredConfig();
+});
+
 // ---------- model-config ----------
 
 When('resolveConfig is called with empty env and empty stored', function (this: TTWorld) {

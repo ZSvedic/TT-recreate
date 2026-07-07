@@ -13,11 +13,18 @@
   recorded ops; cell batches by array length plus input↔output affinity.
   Scenario-built tapes (cassettes.feature) stay byte-strict — the matcher is
   only enabled for the committed cassettes.
-- **Only the Gemini provider is wired for live calls** (all cassettes record
-  with Gemini defaults). Anthropic/OpenAI resolution logic exists in
-  model-config; their HTTP clients are not implemented.
-- **`TAMEDTABLE_RPM` is accepted but not enforced** — replay never touches the
-  network; a live rate limiter is out of scope for the recreation.
+- **All three providers speak their own wire protocol** (session 5): hand-
+  rolled clients over the same `FetchLike` — Gemini `generateContent`
+  (`x-goog-api-key`), Anthropic Messages (`x-api-key` +
+  `anthropic-version: 2023-06-01`, `ANTHROPIC_BASE_URL` honoured), OpenAI Chat
+  Completions (`Bearer`). `clientFor(providerFor(model))` picks; cassettes
+  still record with Gemini defaults. Voice stays Gemini-only — the other
+  clients reject an audio part with a clear error.
+- **`TAMEDTABLE_RPM` is a sliding-window limiter** (session 5) in
+  `headless/rpm.ts`, gating every HTTP attempt; `rpm <= 0` disables it and
+  replay runs set it to 0 (`run-cucumber.ts`) since cassette hits touch no
+  network. `run-cucumber.ts` also unsets `ANTHROPIC_BASE_URL` — the Claude
+  Code sandbox exports one, which would repoint wire-shape assertions.
 - **No prefix caching of derived rows.** Re-running the transformation list
   re-uses the per-cell LLM cache, so committed `{llm}` transformations replay
   without model calls; the row-prefix cache from behavior.md is a pure

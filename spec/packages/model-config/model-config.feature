@@ -221,6 +221,39 @@ Feature: Model config
     Scenario: gemini-3.5-flash has voiceInput true
       Then the model "gemini-3.5-flash" has voiceInput true
 
+  Rule: storage.ts persists config in localStorage
+
+    The storage entry point implements StoragePort over localStorage under the
+    single key "tamedtable.config"; helpers are safe no-ops without localStorage.
+
+    @headless
+    Scenario: writeStoredConfig round-trips through readStoredConfig
+      Given a fake localStorage
+      When writeStoredConfig is called with provider "anthropic" and anthropicKey "sk-ant-1"
+      Then readStoredConfig returns provider "anthropic" and anthropicKey "sk-ant-1"
+      And the fake localStorage holds a "tamedtable.config" blob
+
+    @headless
+    Scenario: clearStoredConfig removes the blob
+      Given a fake localStorage
+      When writeStoredConfig is called with provider "anthropic" and anthropicKey "sk-ant-1"
+      And clearStoredConfig is called
+      Then readStoredConfig returns an empty config
+      And the fake localStorage has no "tamedtable.config" blob
+
+    @headless
+    Scenario: A legacy tamedtable.apiKey value migrates to anthropicKey on first read
+      Given a fake localStorage where "tamedtable.apiKey" is "sk-legacy"
+      When readStoredConfig is called
+      Then readStoredConfig returns anthropicKey "sk-legacy"
+      And the fake localStorage has no "tamedtable.apiKey" entry
+
+    @headless
+    Scenario: Without localStorage the helpers are safe no-ops
+      Given no localStorage is available
+      Then readStoredConfig returns an empty config
+      And writeStoredConfig and clearStoredConfig do not throw
+
   Rule: ModelChooser component
 
     The provider accordion is a pure React component, mounted on the package
@@ -274,6 +307,15 @@ Feature: Model config
     Scenario: The chooser links to the FAQ on changing the default models
       Given the model-config demo page
       Then the chooser shows a change-models help link to "FAQ.html#change-models" in a new tab
+
+    @web
+    Scenario: A typed key persists across a demo page reload
+      Given the model-config demo page
+      When the user clicks the "Anthropic" provider card
+      And the user types "sk-ant-persist" into the "anthropic" key field
+      And the demo page reloads
+      Then the demo shows resolved provider "anthropic"
+      And the demo shows resolved anthropicKey "sk-ant-persist"
 
     @web
     Scenario: A typed API key stays masked until the eye toggle reveals it

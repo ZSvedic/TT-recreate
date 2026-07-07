@@ -16,6 +16,22 @@ function clipBlob(name: string): Blob {
 
 // ---------- keys / providers / settings ----------
 
+Given('the TamedTable web app with persistent storage and no env key', function (this: TTWorld) {
+  let blob: Record<string, unknown> = {};
+  this.storagePort = {
+    read: () => structuredClone(blob),
+    write: (c) => { blob = { ...blob, ...c }; },
+    clear: () => { blob = {}; },
+  };
+  this.controllerEnv = {};
+  this.ensureController();
+});
+
+When('the web app reloads', function (this: TTWorld) {
+  this.controller = null;
+  this.ensureController();
+});
+
 Given('the API key has not been set', function (this: TTWorld) {
   ctl(this).clearKeys();
 });
@@ -75,6 +91,47 @@ Given('the LLM API returns a 401 unauthorized error', async function (this: TTWo
     '{"error":{"code":401,"message":"API key not valid. Please pass a valid API key.","status":"UNAUTHENTICATED"}}',
     { status: 401, statusText: 'Unauthorized' },
   ));
+});
+
+Given('the LLM API captures each request', async function (this: TTWorld) {
+  await ctl(this).setFetchOverride(async (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    this.capturedRequest = {
+      url,
+      headers: Object.fromEntries(Object.entries((init?.headers as Record<string, string>) ?? {})
+        .map(([k, v]) => [k.toLowerCase(), v])),
+      body: typeof init?.body === 'string' ? init.body : '',
+    };
+    return new Response('{"error":{"code":401,"message":"captured","status":"UNAUTHENTICATED"}}',
+      { status: 401, statusText: 'Unauthorized' });
+  });
+});
+
+Then('the captured request URL contains {string}', function (this: TTWorld, s: string) {
+  assert.ok(this.capturedRequest, 'no request captured');
+  assert.ok(this.capturedRequest!.url.includes(s), `URL was: ${this.capturedRequest!.url}`);
+});
+Then('the captured request header {string} is {string}', function (this: TTWorld, name: string, value: string) {
+  assert.equal(this.capturedRequest?.headers[name.toLowerCase()], value,
+    `headers were: ${JSON.stringify(this.capturedRequest?.headers)}`);
+});
+Then('the captured request body names the tool {string}', function (this: TTWorld, tool: string) {
+  assert.ok(this.capturedRequest?.body.includes(`"${tool}"`), `body was: ${this.capturedRequest?.body.slice(0, 400)}`);
+});
+Then('the captured request body carries the model {string}', function (this: TTWorld, model: string) {
+  const body = JSON.parse(this.capturedRequest?.body ?? '{}') as { model?: string };
+  assert.equal(body.model, model, `body was: ${this.capturedRequest?.body.slice(0, 400)}`);
+});
+
+Given('the LLM API returns a 404 not found error', async function (this: TTWorld) {
+  await ctl(this).setFetchOverride(async () => new Response(
+    '{"error":{"code":404,"message":"model not found","status":"NOT_FOUND"}}',
+    { status: 404, statusText: 'Not Found' },
+  ));
+});
+
+Given('the LLM API is unreachable', async function (this: TTWorld) {
+  await ctl(this).setFetchOverride(async () => { throw new Error('fetch failed: network unreachable'); });
 });
 
 Given("the LLM API captures each request's key", async function (this: TTWorld) {

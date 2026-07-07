@@ -1,11 +1,19 @@
 // #ModelConfig demo — mounts the provider accordion over plain state and shows
 // the resolveConfig result live; every callback appends to the #out event log.
 import { ALL_MODELS, defaultCellModel, defaultModel, resolveConfig, type Provider } from './index';
+import { readStoredConfig, writeStoredConfig } from './storage';
 import { mountModelChooser } from './dom';
 
-let provider: Provider = resolveConfig({}, {}).provider;
+// Shared persistence: seed from the same localStorage blob the main app uses,
+// and write every change back, so keys carry over in both directions.
+const stored = readStoredConfig();
+let provider: Provider = resolveConfig({}, stored).provider;
 let expanded: Provider | null = null;
-const keys: Record<Provider, string> = { anthropic: '', gemini: '', openai: '' };
+const keys: Record<Provider, string> = {
+  anthropic: stored.anthropicKey ?? '',
+  gemini: stored.geminiKey ?? '',
+  openai: stored.openaiKey ?? '',
+};
 
 const out = document.getElementById('out')!;
 const log = (msg: string) => { out.textContent += `${msg}\n`; };
@@ -46,6 +54,7 @@ function render() {
     },
   });
   document.getElementById('resolved')!.textContent = JSON.stringify(resolved, null, 2);
+  writeStoredConfig(resolved);
 }
 
 log('ready');

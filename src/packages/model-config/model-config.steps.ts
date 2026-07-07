@@ -2,11 +2,12 @@
 // Imports only @cucumber/cucumber + playwright (package-steps rule); the demo
 // bundle is built with Bun.build and served by Bun.serve, both bun globals.
 import { AfterAll, Given, Then, When } from '@cucumber/cucumber';
-import { chromium, type Browser, type Page } from 'playwright';
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { strict as assert } from 'node:assert';
 
 const DIR = import.meta.dir;
 let browser: Browser | undefined;
+let context: BrowserContext | undefined;
 let server: ReturnType<typeof Bun.serve> | undefined;
 let page: Page;
 
@@ -29,7 +30,10 @@ async function openDemo(): Promise<Page> {
   browser ??= await chromium.launch().catch(() =>
     chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }));
   if (page) await page.close();
-  page = await browser.newPage();
+  // A fresh context per scenario isolates localStorage (shared persistence).
+  if (context) await context.close();
+  context = await browser.newContext();
+  page = await context.newPage();
   await page.goto(`http://localhost:${server.port}/demo.html`);
   await page.waitForFunction(() => (document.getElementById('out')?.textContent ?? '') !== '');
   return page;
@@ -46,6 +50,11 @@ AfterAll(async () => {
 
 Given('the model-config demo page', async () => {
   await openDemo();
+});
+
+When('the demo page reloads', async () => {
+  await page.reload();
+  await page.waitForFunction(() => (document.getElementById('out')?.textContent ?? '') !== '');
 });
 
 When('the user clicks the {string} provider card', async (label: string) => {

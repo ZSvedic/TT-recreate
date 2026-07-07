@@ -7,8 +7,10 @@ import {
 import type { FetchLike } from '@tamedtable/headless/client.ts';
 import type { Row, TablePlan, Transformation } from '@tamedtable/core';
 import {
-  ALL_MODELS, defaultModel, defaultCellModel, providerFor, type Provider,
+  ALL_MODELS, defaultModel, defaultCellModel, providerFor, resolveConfig,
+  type Provider, type StoragePort,
 } from '@tamedtable/model-config';
+import { readStoredConfig, writeStoredConfig, clearStoredConfig } from '@tamedtable/model-config/storage';
 import { buildVoicePrompt, type VoicePort, type VoiceContext } from '@tamedtable/voice-input';
 import { fetchTable, serializeFlow, type FormatId } from '@tamedtable/file-io';
 import { pageCountFor, clampPage, pageSlice } from '@tamedtable/table-view';
@@ -44,6 +46,8 @@ export interface WebControllerOptions {
   /** Base engine options (fetch hook, cwd, batch sizes) — re-read on every rebuild. */
   engineOptions?: () => HeadlessRunnerOptions;
   env?: Record<string, string | undefined>;
+  /** Config persistence; defaults to the localStorage StoragePort (storage.ts). */
+  storage?: StoragePort;
   fsAccess?: boolean;
   /** Directory confirmed saves land in (host-resolved absolute prefix). */
   saveDir?: string;
@@ -139,14 +143,23 @@ export class WebController {
   private continuousBusy = false;
   readonly version: string;
 
+  private storage: StoragePort;
+
   constructor(private opts: WebControllerOptions = {}) {
     this.version = opts.version ?? '0.1.0-recreate';
-    this.model = defaultModel('gemini');
-    this.cellModel = defaultCellModel('gemini');
+    this.storage = opts.storage
+      ?? { read: readStoredConfig, write: writeStoredConfig, clear: clearStoredConfig };
     const env = opts.env ?? {};
+    // Boot config: env wins over the stored blob (spec/packages/model-config).
+    const stored = this.storage.read();
+    const resolved = resolveConfig(env, stored);
+    this.provider = resolved.provider;
+    this.model = resolved.model;
+    this.cellModel = resolved.cellModel;
+    this.providerChosen = Boolean(stored.provider);
+    // Keep every provider's key (env over stored) so switching back needs no retype.
     for (const p of ['gemini', 'openai', 'anthropic'] as Provider[]) {
-      const k = env[ENV_HINTS[p]];
-      if (k) this.keys[p] = k;
+      this.keys[p] = env[ENV_HINTS[p]] ?? stored[`${p}Key` as const] ?? null;
     }
     this.voicePort = opts.voice ?? null;
     this.continuousPort = opts.continuousVoice ?? null;
@@ -255,16 +268,32 @@ export class WebController {
 
   // ---------- config / settings ----------
 
+  /** Write-through: every config change lands in the StoragePort blob. */
+  private persist(): void {
+    this.storage.write({
+      provider: this.provider,
+      model: this.model,
+      cellModel: this.cellModel,
+      geminiKey: this.keys.gemini,
+      openaiKey: this.keys.openai,
+      anthropicKey: this.keys.anthropic,
+    });
+  }
+
   configuredApiKey(): string | null { return this.keys[this.provider]; }
-  setKey(provider: Provider, key: string | null): void { this.keys[provider] = key; }
-  saveApiKey(key: string): void { this.keys[this.provider] = key; }
-  clearKeys(): void { this.keys = { gemini: null, openai: null, anthropic: null }; }
+  setKey(provider: Provider, key: string | null): void { this.keys[provider] = key; this.persist(); }
+  saveApiKey(key: string): void { this.keys[this.provider] = key; this.persist(); }
+  clearKeys(): void {
+    this.keys = { gemini: null, openai: null, anthropic: null };
+    this.persist();
+  }
 
   async selectProvider(p: Provider): Promise<void> {
     this.providerChosen = true;
     this.provider = p;
     this.model = defaultModel(p);
     this.cellModel = defaultCellModel(p);
+    this.persist();
     await this.rebuildEngine();
   }
 
@@ -272,6 +301,7 @@ export class WebController {
     this.model = model;
     const p = providerFor(model);
     if (p !== this.provider) { this.provider = p; this.cellModel = defaultCellModel(p); }
+    this.persist();
     await this.rebuildEngine();
   }
 

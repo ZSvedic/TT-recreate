@@ -11,6 +11,12 @@ if (!['headless', 'cli', 'web'].includes(profile ?? '')) {
 }
 process.env.TAMEDTABLE_CASSETTE ??= 'replay';
 process.env.TAMEDTABLE_PROFILE = profile;
+// Hermetic wire assertions: a sandbox-level ANTHROPIC_BASE_URL (Claude Code
+// sets one) must not repoint the engine's Anthropic endpoint under test.
+delete process.env.ANTHROPIC_BASE_URL;
+// Replay never touches the network — lift the RPM cap so cassette hits
+// (and capture-stub fetches) add no idle delay (spec/code-contract.md).
+if (process.env.TAMEDTABLE_CASSETTE === 'replay') process.env.TAMEDTABLE_RPM = '0';
 
 const only = process.env.TAMEDTABLE_FEATURES?.split(',').map((s) => s.trim()).filter(Boolean);
 // TAMEDTABLE_SCOPE=app: app features only (spec/test-cases), no package demos.

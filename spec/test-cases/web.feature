@@ -45,6 +45,25 @@ Feature: Web front-end
       When user sends the chat message "normalize dob col"
       Then the captured model request carried API key "brand-new-key"
 
+    @web
+    Scenario: A key entered in Settings survives a reload and reaches the wire
+      Given the TamedTable web app with persistent storage and no env key
+      And the gemini key is set to "persisted-key"
+      When the web app reloads
+      And load "customers-input.csv"
+      And the LLM API captures each request's key
+      And user sends the chat message "normalize dob col"
+      Then the captured model request carried API key "persisted-key"
+
+    @web
+    Scenario: A stored provider choice survives a reload
+      Given the TamedTable web app with persistent storage and no env key
+      When user selects the provider "anthropic"
+      And the web app reloads
+      Then the configured provider is "anthropic"
+      And the configured model is "claude-sonnet-4-6"
+      And the configured cellModel is "claude-haiku-4-5"
+
   Rule: Files move through a dialog handshake
 
     @web
@@ -381,6 +400,45 @@ Feature: Web front-end
       And user opens the settings panel
       Then the provider card "openai" is expanded
 
+  Rule: Live requests speak each provider's wire protocol
+
+    A patch turn goes to the selected provider's own endpoint with that
+    provider's auth header, carrying the apply_spec_patch tool and the
+    selected primary model.
+
+    Background:
+      Given the TamedTable web app
+      And load "customers-input.csv"
+      And the LLM API captures each request
+
+    @web
+    Scenario: A Gemini chat request posts to generateContent with x-goog-api-key
+      Given the provider "gemini" has API key "AIza-test"
+      When user sends the chat message "normalize dob col"
+      Then the captured request URL contains "generativelanguage.googleapis.com"
+      And the captured request URL contains "models/gemini-3.5-flash:generateContent"
+      And the captured request header "x-goog-api-key" is "AIza-test"
+      And the captured request body names the tool "apply_spec_patch"
+
+    @web
+    Scenario: An Anthropic chat request posts to v1/messages with x-api-key
+      Given the provider "anthropic" has API key "sk-ant-test"
+      When user sends the chat message "normalize dob col"
+      Then the captured request URL contains "api.anthropic.com/v1/messages"
+      And the captured request header "x-api-key" is "sk-ant-test"
+      And the captured request header "anthropic-version" is "2023-06-01"
+      And the captured request body names the tool "apply_spec_patch"
+      And the captured request body carries the model "claude-sonnet-4-6"
+
+    @web
+    Scenario: An OpenAI chat request posts to chat/completions with a bearer token
+      Given the provider "openai" has API key "sk-openai-test"
+      When user sends the chat message "normalize dob col"
+      Then the captured request URL contains "api.openai.com/v1/chat/completions"
+      And the captured request header "authorization" is "Bearer sk-openai-test"
+      And the captured request body names the tool "apply_spec_patch"
+      And the captured request body carries the model "gpt-5.5"
+
   Rule: Provider API errors surface descriptive messages
 
     @web
@@ -403,3 +461,45 @@ Feature: Web front-end
       And the LLM API returns a 401 unauthorized error
       When user sends the chat message "norm dob col"
       Then a toast shows "Invalid API key"
+      And a toast shows "OpenAI key"
+
+    @web
+    Scenario: An Anthropic request with a wrong key shows a descriptive error
+      Given the TamedTable web app
+      And load "customers-input.csv"
+      And user clicks the provider card "anthropic"
+      And the anthropic key is set to "bad-key"
+      And the LLM API returns a 401 unauthorized error
+      When user sends the chat message "norm dob col"
+      Then a toast shows "Invalid API key"
+      And a toast shows "Anthropic key"
+
+    @web
+    Scenario Outline: A missing model surfaces "Model not found" for <provider>
+      Given the TamedTable web app
+      And load "customers-input.csv"
+      And the provider "<provider>" has API key "some-key"
+      And the LLM API returns a 404 not found error
+      When user sends the chat message "norm dob col"
+      Then a toast shows "Model not found"
+
+      Examples:
+        | provider  |
+        | gemini    |
+        | openai    |
+        | anthropic |
+
+    @web
+    Scenario Outline: A network failure names the <name> API
+      Given the TamedTable web app
+      And load "customers-input.csv"
+      And the provider "<provider>" has API key "some-key"
+      And the LLM API is unreachable
+      When user sends the chat message "norm dob col"
+      Then a toast shows "Network error. Could not reach the <name> API."
+
+      Examples:
+        | provider  | name      |
+        | gemini    | Google    |
+        | openai    | OpenAI    |
+        | anthropic | Anthropic |
