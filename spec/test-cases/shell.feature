@@ -105,6 +105,16 @@ Feature: Browser shell
       And the browser user types the URL "http://example.com/data.csv"
       Then the URL dialog shows an unencrypted hint
 
+  Rule: Hands-free voice has a shell toggle
+
+    @web
+    Scenario: A key plus a voice-capable model reveal the waveform toggle
+      Given the built web app in a browser
+      When the browser user opens Settings from the toolbar
+      And the browser user enters the gemini key "AIza-test"
+      And the browser user closes the settings panel
+      Then the chat panel shows the waveform toggle in state "idle"
+
   Rule: Diagnostics actions live in Settings
 
     @web

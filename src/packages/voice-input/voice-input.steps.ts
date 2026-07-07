@@ -65,3 +65,7 @@ Then('the recording result shows {string}', async (text: string) => {
 Then('the voice state is {string}', async (state: string) => {
   assert.equal((await page.textContent('#vi-state'))?.trim(), state);
 });
+
+Then('the demo capability panel reports {string}', async (name: string) => {
+  assert.ok((await page.textContent('#caps'))?.includes(name), `caps missing ${name}`);
+});

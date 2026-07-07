@@ -396,6 +396,11 @@ function installStubContinuous(w: TTWorld): void {
 }
 
 When('user presses and holds the mic button', async function (this: TTWorld) { await ctl(this).startVoice(); });
+When('{int} seconds pass without a release', async function (this: TTWorld, secs: number) {
+  const due = this.voiceTimers.filter((t) => t.ms <= secs * 1000);
+  assert.ok(due.length > 0, `no armed voice timer within ${secs}s (armed: ${JSON.stringify(this.voiceTimers.map((t) => t.ms))})`);
+  for (const t of due) await t.fn();
+});
 When('user releases the mic button', async function (this: TTWorld) { await ctl(this).stopVoice(); });
 When('user taps the mic button', async function (this: TTWorld) {
   await ctl(this).startVoice();

@@ -384,3 +384,36 @@ export function mountChatPanel(container: HTMLElement, p: ChatPanelProps): void 
   inputWrap.appendChild(hint);
   container.appendChild(inputWrap);
 }
+
+export interface WaveButtonProps {
+  status: 'idle' | 'listening' | 'sending';
+  onToggle: () => void;
+}
+
+/** The hands-free waveform toggle next to the mic: idle → listening (pulsing
+ *  bars) → sending (spinner while a turn applies), behavior.md #VoiceInput. */
+export function mountWaveButton(container: HTMLElement, p: WaveButtonProps): void {
+  container.innerHTML = '';
+  const b = document.createElement('button');
+  b.setAttribute('data-cp-wave', p.status);
+  b.title = p.status === 'idle' ? 'Hands-free voice (toggle)' : 'Stop hands-free voice';
+  b.style.cssText = 'width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;' +
+    'border-radius:15px;cursor:pointer;font:inherit;' +
+    (p.status === 'idle'
+      ? 'background:transparent;border:1px solid var(--cp-line2,#c9c9c9);color:var(--cp-ink3,#6d6491)'
+      : 'background:var(--cp-accent-soft,#e3edf5);border:1px solid var(--cp-accent,#96BED7);color:var(--cp-ink,#281C60)');
+  if (p.status === 'sending') {
+    const spin = document.createElement('span');
+    spin.className = 'cp-spin';
+    spin.style.cssText = 'width:12px;height:12px;border-radius:50%;border:2px solid var(--cp-accent,#96BED7);' +
+      'border-top-color:transparent';
+    b.appendChild(spin);
+  } else {
+    b.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.6" stroke-linecap="round"' +
+      (p.status === 'listening' ? ' style="animation:cp-pulse 1s ease-in-out infinite"' : '') +
+      '><path d="M2.5 6.5v3 M5.5 4.5v7 M8.5 2.5v11 M11.5 4.5v7 M14.5 6.5v3"/></svg>';
+  }
+  b.addEventListener('click', p.onToggle);
+  container.appendChild(b);
+}

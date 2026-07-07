@@ -272,6 +272,19 @@ Then('no browser toast is shown', async () => {
   assert.equal(await page.locator('[data-uk-toast]').count(), 0);
 });
 
+When('the browser user enters the gemini key {string}', async (key: string) => {
+  await page.click('[data-mc-card="gemini"] [data-mc-head]');
+  await page.fill('[data-mc-key="gemini"]', key);
+});
+
+When('the browser user closes the settings panel', async () => {
+  await page.click('[data-sheet-close]');
+});
+
+Then('the chat panel shows the waveform toggle in state {string}', async (state: string) => {
+  await page.waitForSelector(`[data-cp-wave="${state}"]`, { timeout: 10_000 });
+});
+
 Then('the settings panel offers the diagnostics actions', async () => {
   for (const sel of ['[data-diag-send]', '[data-diag-copy]', '[data-diag-clear]']) {
     assert.equal(await page.locator(sel).count(), 1, `missing ${sel}`);
