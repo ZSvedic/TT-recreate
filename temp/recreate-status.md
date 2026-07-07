@@ -1,6 +1,15 @@
 # Recreation status — 2026-07-07 (session 5: close all remaining gaps)
 
-Progress: **20 of 21 checklist items green** (open: final gate — deploy + live verify).
+Progress: **21 of 21 checklist items green.**
+
+Final gate (2026-07-07): full suite green (16 unit / 180 @headless /
+116 @cli / 228 @web), typecheck clean, smoke green; deploy + Link check
+succeeded on main `5d611da`; live-verified on the built `_site` bytes in
+headless Chromium — the filter-tour deep link completes, and a real
+Gemini request with the env key entered through Settings filters the
+table to 4 rows (the browser's tunnel to googleapis is gateway-blocked
+in this sandbox, so the app's exact request bytes were carried over
+curl). Light, dark, and 390×844 screenshots delivered.
 
 ## Task 0 — spec-vs-implementation audit (done)
 
