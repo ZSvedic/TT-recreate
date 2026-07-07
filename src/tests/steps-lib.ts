@@ -105,6 +105,31 @@ Then('the flow JSON spec has columns {string}', function (this: TTWorld, cols: s
   assert.deepEqual(flow.spec.columns.map((c) => c.id), cols.split(',').map((s) => s.trim()));
 });
 
+When('parseTable is called with name {string} and bytes {string}', async function (this: TTWorld, name: string, body: string) {
+  const { parseTable } = await import('@tamedtable/file-io');
+  try {
+    this.scratch.parsed = await parseTable(name, new TextEncoder().encode(nl(body)));
+    this.scratch.parseError = null;
+  } catch (e) {
+    this.scratch.parseError = e as Error;
+  }
+});
+Then('the parsed table has {int} rows', function (this: TTWorld, n: number) {
+  assert.ok(!this.scratch.parseError, String(this.scratch.parseError));
+  assert.equal((this.scratch.parsed as { rows: unknown[] }).rows.length, n);
+});
+Then('the parsed plan has columns {string}', function (this: TTWorld, cols: string) {
+  const spec = (this.scratch.parsed as { spec: { columns: Array<{ id: string }> } }).spec;
+  assert.deepEqual(spec.columns.map((c) => c.id), cols.split(',').map((s) => s.trim()));
+});
+Then('the parsed plan names the table {string}', function (this: TTWorld, t: string) {
+  assert.equal((this.scratch.parsed as { spec: { table?: string } }).spec.table, t);
+});
+Then('parseTable fails mentioning {string}', function (this: TTWorld, msg: string) {
+  assert.ok(this.scratch.parseError, 'parseTable did not fail');
+  assert.ok((this.scratch.parseError as Error).message.toLowerCase().includes(msg), (this.scratch.parseError as Error).message);
+});
+
 // ---------- gherkin-tour ----------
 
 Given('a feature string:', function (this: TTWorld, doc: string) {
@@ -322,6 +347,10 @@ When(/^resolveConfig is called with env (\w+)="([^"]*)" and stored (\w+) "([^"]*
 
 When('resolveConfig is called with stored provider {string} and cellModel {string}', function (this: TTWorld, provider: string, cellModel: string) {
   this.scratch.config = resolveConfig({}, { provider: provider as Provider, cellModel });
+});
+
+When('resolveConfig is called with stored provider {string} and model {string}', function (this: TTWorld, provider: string, model: string) {
+  this.scratch.config = resolveConfig({}, { provider: provider as Provider, model });
 });
 
 const cfg = (w: TTWorld): ResolvedConfig => w.scratch.config as ResolvedConfig;

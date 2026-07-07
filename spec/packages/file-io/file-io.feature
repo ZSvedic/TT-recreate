@@ -126,3 +126,23 @@ Feature: File IO package
     Scenario: The demo reports the browser's file dialog capability
       Given the file-io demo page
       Then the demo capability line reports the File System Access API
+
+  Rule: parseTable builds a fresh-load plan from bytes
+
+    @headless
+    Scenario: parseTable parses CSV bytes into rows and a plan
+      When parseTable is called with name "customers.csv" and bytes "ID,Name\n1,Ana\n2,Bo"
+      Then the parsed table has 2 rows
+      And the parsed plan has columns "ID, Name"
+      And the parsed plan names the table "customers.csv"
+
+    @headless
+    Scenario: parseTable parses JSONL bytes too
+      When parseTable is called with name "rows.jsonl" and bytes "{\"a\":1}\n{\"a\":2,\"b\":3}"
+      Then the parsed table has 2 rows
+      And the parsed plan has columns "a, b"
+
+    @headless
+    Scenario: parseTable refuses an undetectable name
+      When parseTable is called with name "table.xyz" and bytes "a"
+      Then parseTable fails mentioning "format"

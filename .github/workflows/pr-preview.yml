@@ -1,14 +1,18 @@
 name: Deploy PR preview
-# Opt-in live preview at
-#   https://www.tamedtable.com/pr-preview/pr-<N>/
-# Add the `pr-preview` label to a PR to build it; pushes then keep it fresh while
-# the label is on. Torn down when the PR closes. Shares the gh-pages branch with
-# prod (deploy.yml): prod at the root, previews under pr-preview/.
+# Opt-in preview build, label-gated (`pr-preview`), as a workflow ARTIFACT.
+#
+# Prod deploys through the Actions-native Pages flow (deploy.yml), which
+# publishes exactly one artifact for the whole site — there is no shared
+# gh-pages branch for per-PR subdirectories to live in. So a preview here is
+# a downloadable site build instead: add the `pr-preview` label and every
+# push uploads `pr-preview-<N>` (the full _site, built for a local root
+# base); a sticky PR comment links to it with serve instructions. Artifacts
+# expire on their own — no teardown job.
 on:
   pull_request:
-    types: [labeled, synchronize, reopened, closed]
+    types: [labeled, synchronize, reopened]
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
 concurrency:
   group: preview-${{ github.event.number }}
@@ -16,35 +20,49 @@ concurrency:
 jobs:
   preview:
     runs-on: ubuntu-latest
-    # Build only for `pr-preview`-labelled PRs; always run on close so the teardown
-    # still removes a preview dir even after the label is gone.
-    if: >-
-      github.event.action == 'closed' ||
-      contains(github.event.pull_request.labels.*.name, 'pr-preview')
+    if: contains(github.event.pull_request.labels.*.name, 'pr-preview')
     steps:
       - uses: actions/checkout@v5
-      # Build only when deploying. On close, pr-preview-action just removes the
-      # preview dir, so the build steps are skipped.
       - uses: oven-sh/setup-bun@v2
-        if: github.event.action != 'closed'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.cache/ms-playwright
+          key: deps-${{ runner.os }}-${{ hashFiles('src/bun.lock') }}
+          restore-keys: deps-${{ runner.os }}-
       - run: bun install
         working-directory: src
-        if: github.event.action != 'closed'
-      # Bake the per-PR prefix so the preview's asset links resolve at its URL.
-      - name: Build site for preview
-        if: github.event.action != 'closed'
+      - name: Build site for local serving
         run: .github/scripts/build-site.sh
         env:
-          # Custom domain root: previews live at /pr-preview/pr-<N>/ (no
-          # /TamedTable/ prefix). Matches deploy.yml's root base.
-          SITE_BASE: /pr-preview/pr-${{ github.event.number }}/
+          # Root base: the artifact is served locally at /, not under a prefix.
+          SITE_BASE: /
           OUT_DIR: _site
-      - uses: rossjrw/pr-preview-action@v1
+      - uses: actions/upload-artifact@v4
+        id: upload
         with:
-          source-dir: ./_site
-          preview-branch: gh-pages
-          umbrella-dir: pr-preview
-          # The action's `auto` mode ignores the `labeled` event, so adding the
-          # label alone never deploys. Force a deploy on `labeled`; leave every
-          # other event (synchronize / closed / …) to `auto`.
-          action: ${{ github.event.action == 'labeled' && 'deploy' || 'auto' }}
+          name: pr-preview-${{ github.event.number }}
+          path: _site
+          retention-days: 14
+      - name: Comment the preview link on the PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- pr-preview-artifact -->';
+            const body = [
+              marker,
+              `📦 **Preview build ready** — [download pr-preview-${context.issue.number}](${{ toJSON(steps.upload.outputs.artifact-url) }})`,
+              '',
+              'Unzip and serve locally:',
+              '```',
+              'unzip pr-preview-' + context.issue.number + '.zip -d site',
+              'cd site && python3 -m http.server 8080   # → http://localhost:8080/',
+              '```',
+              `Built from ${context.payload.pull_request.head.sha.slice(0, 7)}; the artifact expires in 14 days.`,
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo, issue_number: context.issue.number, per_page: 100 });
+            const mine = comments.find((c) => c.body?.includes(marker));
+            if (mine) await github.rest.issues.updateComment({ ...context.repo, comment_id: mine.id, body });
+            else await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
