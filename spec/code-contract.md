@@ -841,7 +841,7 @@ one is present; otherwise calls `exportPython` and writes the result.
 ```ts
 type Provider = "anthropic" | "gemini" | "openai";
 
-interface ModelDef { id: string; name: string; desc: string; provider: Provider; voiceInput: boolean; default?: boolean; secondaryDefault?: boolean; }
+interface ModelDef { id: string; name: string; desc: string; provider: Provider; voiceInput: boolean; inUsdPerMtok: number; outUsdPerMtok: number; }
 
 interface ResolvedConfig {
   provider: Provider;
@@ -858,7 +858,8 @@ interface StoragePort {
   clear(): void;
 }
 
-const ALL_MODELS: readonly ModelDef[];  // imported from models.json — the catalogue's single source
+const ALL_MODELS: readonly ModelDef[];  // models.json "models" section — the catalogue's single source
+const DEFAULTS: Record<Provider, { primary: string; secondary: string }>;  // models.json "defaults" section
 function resolveConfig(env: Record<string, string | undefined>, stored: Partial<ResolvedConfig>): ResolvedConfig;
 function defaultModel(provider: Provider): string;      // primary (patch-turn) default
 function defaultCellModel(provider: Provider): string;  // secondary (per-row cell) default

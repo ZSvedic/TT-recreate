@@ -290,14 +290,15 @@ function renderSettings(): HTMLElement {
     primaryModel: controller.model,
     secondaryModel: controller.cellModel,
     expandedProvider: controller.expandedProvider,
+    byokHelpUrl: `${BASE}FAQ.html#byok`,
+    changeModelsHelpUrl: `${BASE}FAQ.html#change-models`,
     onProviderClick: (p) => void act(() => controller.clickProviderCard(p))(),
     onKeyChange: (p, value) => controller.setKey(p as Provider, value || null),
   });
   mount();
   body.appendChild(chooser);
   const hint = el('p', 'margin:10px 0 0;font-size:11.5px;line-height:1.5;color:var(--uk-ink3)',
-    `Bring your own key — it stays in this tab. Env hints: ${(['gemini', 'openai', 'anthropic'] as Provider[])
-      .map((p) => ENV_HINTS[p]).join(', ')}.`);
+    'Bring your own key — it stays in this browser, never on a server.');
   body.appendChild(hint);
   return wrap;
 }

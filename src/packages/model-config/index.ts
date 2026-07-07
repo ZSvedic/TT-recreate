@@ -5,7 +5,8 @@ export type Provider = 'anthropic' | 'gemini' | 'openai';
 
 export interface ModelDef {
   id: string; name: string; desc: string; provider: Provider;
-  voiceInput: boolean; temperature?: boolean; default?: boolean; secondaryDefault?: boolean;
+  voiceInput: boolean; temperature?: boolean;
+  inUsdPerMtok: number; outUsdPerMtok: number;
 }
 
 export interface ResolvedConfig {
@@ -23,7 +24,10 @@ export interface StoragePort {
   clear(): void;
 }
 
-export const ALL_MODELS: readonly ModelDef[] = modelsJson as ModelDef[];
+const catalogue = modelsJson as { models: ModelDef[]; defaults: Record<Provider, { primary: string; secondary: string }> };
+
+export const ALL_MODELS: readonly ModelDef[] = catalogue.models;
+export const DEFAULTS: Readonly<Record<Provider, { primary: string; secondary: string }>> = catalogue.defaults;
 
 export function providerFor(modelId: string): Provider {
   if (modelId.startsWith('claude-')) return 'anthropic';
@@ -32,11 +36,11 @@ export function providerFor(modelId: string): Provider {
 }
 
 export function defaultModel(provider: Provider): string {
-  return ALL_MODELS.find((m) => m.provider === provider && m.default)!.id;
+  return DEFAULTS[provider]?.primary ?? ALL_MODELS.find((m) => m.provider === provider)!.id;
 }
 
 export function defaultCellModel(provider: Provider): string {
-  return ALL_MODELS.find((m) => m.provider === provider && m.secondaryDefault)!.id;
+  return DEFAULTS[provider]?.secondary ?? defaultModel(provider);
 }
 
 /** False for models that removed sampling params, and for unknown ids. */

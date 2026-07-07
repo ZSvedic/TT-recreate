@@ -369,6 +369,32 @@ Then('ALL_MODELS contains at least one model with provider {string}', function (
   assert.ok(ALL_MODELS.some((m) => m.provider === p));
 });
 
+Then('ALL_MODELS contains the model {string}', function (this: TTWorld, id: string) {
+  assert.ok(ALL_MODELS.some((m) => m.id === id), `no ${id} in catalogue`);
+});
+Then('ALL_MODELS does not contain the model {string}', function (this: TTWorld, id: string) {
+  assert.ok(!ALL_MODELS.some((m) => m.id === id), `${id} unexpectedly in catalogue`);
+});
+Then('every ALL_MODELS entry has inUsdPerMtok and outUsdPerMtok prices', function () {
+  for (const m of ALL_MODELS) {
+    assert.equal(typeof m.inUsdPerMtok, 'number', `${m.id} has no inUsdPerMtok`);
+    assert.equal(typeof m.outUsdPerMtok, 'number', `${m.id} has no outUsdPerMtok`);
+  }
+});
+Then('the model {string} costs {float} in and {float} out per Mtok', function (this: TTWorld, id: string, inPrice: number, outPrice: number) {
+  const m = ALL_MODELS.find((x) => x.id === id);
+  assert.ok(m, `no ${id} in catalogue`);
+  assert.equal(m!.inUsdPerMtok, inPrice);
+  assert.equal(m!.outUsdPerMtok, outPrice);
+});
+Then('DEFAULTS names the {word} primary {string} and secondary {string}', async function (this: TTWorld, p: string, primary: string, secondary: string) {
+  const { DEFAULTS } = await import('@tamedtable/model-config');
+  const d = (DEFAULTS as Record<string, { primary: string; secondary: string }>)[p];
+  assert.ok(d, `no DEFAULTS entry for ${p}`);
+  assert.equal(d.primary, primary);
+  assert.equal(d.secondary, secondary);
+});
+
 Then('every ALL_MODELS entry has a voiceInput boolean field', function () {
   for (const m of ALL_MODELS) assert.equal(typeof m.voiceInput, 'boolean');
 });

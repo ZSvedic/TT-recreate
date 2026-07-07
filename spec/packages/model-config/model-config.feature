@@ -221,6 +221,38 @@ Feature: Model config
     Scenario: gemini-3.5-flash has voiceInput true
       Then the model "gemini-3.5-flash" has voiceInput true
 
+    @headless
+    # voiceInput mirrors benchmarks/models.jsonl audioInput: flash-lite has none.
+    Scenario: gemini-3.1-flash-lite has voiceInput false
+      Then the model "gemini-3.1-flash-lite" has voiceInput false
+
+    @headless
+    # Membership rule: the catalogue equals models.jsonl minus runnable:false.
+    Scenario: The catalogue carries every runnable benchmark model
+      Then ALL_MODELS contains the model "gemini-2.5-flash"
+      And ALL_MODELS contains the model "claude-fable-5"
+      And ALL_MODELS does not contain the model "gpt-5.5-pro"
+
+    @headless
+    Scenario: Every catalogue entry carries per-Mtok prices
+      Then every ALL_MODELS entry has inUsdPerMtok and outUsdPerMtok prices
+
+    @headless
+    Scenario: gemini-3.5-flash is priced 1.5 in and 9 out
+      Then the model "gemini-3.5-flash" costs 1.5 in and 9 out per Mtok
+
+  Rule: DEFAULTS names each provider's two roles
+
+    @headless
+    Scenario Outline: DEFAULTS for <provider>
+      Then DEFAULTS names the <provider> primary "<primary>" and secondary "<secondary>"
+
+      Examples:
+        | provider  | primary           | secondary             |
+        | gemini    | gemini-3.5-flash  | gemini-3.1-flash-lite |
+        | openai    | gpt-5.5           | gpt-5.4-mini          |
+        | anthropic | claude-sonnet-4-6 | claude-haiku-4-5      |
+
   Rule: storage.ts persists config in localStorage
 
     The storage entry point implements StoragePort over localStorage under the
@@ -287,6 +319,19 @@ Feature: Model config
       When the user clicks the "OpenAI" provider card
       Then the "openai" card's primary default is "gpt-5.5"
       And the "openai" card's secondary default is "gpt-5.4-mini"
+
+    @web
+    Scenario: Each default row shows its per-Mtok price
+      Given the model-config demo page
+      When the user clicks the "Google" provider card
+      Then the "primary" default row shows the price "$1.5 in / $9 out"
+      And the "secondary" default row shows the price "$0.25 in / $1.5 out"
+
+    @web
+    Scenario: The card body shows the env-var hint under the key field
+      Given the model-config demo page
+      When the user clicks the "Google" provider card
+      Then the "gemini" card shows the env hint "or set GEMINI_API_KEY in .env"
 
     @web
     Scenario: Each expanded card deep-links to that provider's key page

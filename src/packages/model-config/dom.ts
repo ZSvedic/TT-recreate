@@ -18,10 +18,10 @@ export interface ModelChooserProps {
   onKeyChange: (p: Provider, value: string) => void;
 }
 
-const CARDS: { provider: Provider; label: string; tagline: string; keyUrl: string; placeholder: string }[] = [
-  { provider: 'gemini', label: 'Google', tagline: 'Gemini models', keyUrl: 'https://aistudio.google.com/apikey', placeholder: 'AIza…' },
-  { provider: 'openai', label: 'OpenAI', tagline: 'GPT models', keyUrl: 'https://platform.openai.com/api-keys', placeholder: 'sk-…' },
-  { provider: 'anthropic', label: 'Anthropic', tagline: 'Claude models', keyUrl: 'https://console.anthropic.com/settings/keys', placeholder: 'sk-ant-…' },
+const CARDS: { provider: Provider; label: string; tagline: string; keyUrl: string; placeholder: string; envHint: string }[] = [
+  { provider: 'gemini', label: 'Google', tagline: 'Gemini models', keyUrl: 'https://aistudio.google.com/apikey', placeholder: 'AIza…', envHint: 'or set GEMINI_API_KEY in .env' },
+  { provider: 'openai', label: 'OpenAI', tagline: 'GPT models', keyUrl: 'https://platform.openai.com/api-keys', placeholder: 'sk-…', envHint: 'or set OPENAI_API_KEY in .env' },
+  { provider: 'anthropic', label: 'Anthropic', tagline: 'Claude models', keyUrl: 'https://console.anthropic.com/settings/keys', placeholder: 'sk-ant-…', envHint: 'or set ANTHROPIC_API_KEY in .env' },
 ];
 
 const EYE_SVG = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" ' +
@@ -64,6 +64,13 @@ function modelRow(role: 'primary' | 'secondary', id: string, models: readonly Mo
   label.textContent = `${role === 'primary' ? 'Primary' : 'Secondary'}: ${id}`;
   label.style.cssText = 'flex:1;font-family:var(--mc-font-mono,monospace);font-size:12.5px';
   row.appendChild(label);
+  if (def) {
+    const price = document.createElement('span');
+    price.setAttribute('data-mc-price', '');
+    price.textContent = `$${def.inUsdPerMtok} in / $${def.outUsdPerMtok} out`;
+    price.style.cssText = 'font-size:11.5px;color:var(--mc-ink3,#6d6491);flex-shrink:0;white-space:nowrap';
+    row.appendChild(price);
+  }
   if (def?.voiceInput) {
     const tag = document.createElement('span');
     tag.textContent = '🎙 voice';
@@ -88,7 +95,9 @@ export function mountModelChooser(container: HTMLElement, p: ModelChooserProps):
     'color:var(--mc-ink,#281C60);max-width:480px';
 
   const intro = document.createElement('p');
-  intro.textContent = 'Pick a provider. The Primary model answers chat turns; the Secondary model fills table cells.';
+  intro.innerHTML = '<b>Primary</b> writes the spec patch each turn and handles voice input. ' +
+    '<b>Secondary</b> fills per-row AI cells — a cheaper model for bulk work. ' +
+    'Both use the selected provider.';
   intro.style.cssText = 'margin:0 0 8px;color:var(--mc-ink3,#6d6491);font-size:11.5px;line-height:1.45';
   container.appendChild(intro);
   if (p.byokHelpUrl) container.appendChild(helpLink('data-mc-byok', p.byokHelpUrl, 'New here? How to get an API key ↗'));
@@ -157,6 +166,13 @@ export function mountModelChooser(container: HTMLElement, p: ModelChooserProps):
       });
       keyRow.appendChild(reveal);
       body.appendChild(keyRow);
+
+      const envHint = document.createElement('div');
+      envHint.setAttribute('data-mc-envhint', '');
+      envHint.textContent = card.envHint;
+      envHint.style.cssText = 'font-family:var(--mc-font-mono,monospace);font-size:11.5px;' +
+        'color:var(--mc-ink3,#6d6491);margin:4px 0 2px';
+      body.appendChild(envHint);
 
       const link = document.createElement('a');
       link.setAttribute('data-mc-keyurl', card.provider);
