@@ -77,17 +77,17 @@ for (const name of DEMOS) {
   const page = await browser.newPage({ viewport: { width: 1180, height: 740 } });
   try {
     await page.goto(`${base}app/?feature=filter.feature&scenario=${encodeURIComponent('Filter by Country')}`);
-    await page.waitForSelector('[data-tour-bar]', { timeout: 10_000 });
+    await page.waitForSelector('[data-tour-popover]', { timeout: 10_000 });
     for (let i = 0; i < 12; i++) {
-      const next = page.locator('[data-tour-next]');
+      const next = page.locator('[data-tour-next]:not([disabled])');
       if (await next.count() === 0) break;
       await next.click();
       await page.waitForTimeout(300);
     }
-    const barText = await page.textContent('[data-tour-bar]');
+    const popText = await page.textContent('[data-tour-desc]');
     const rows = await page.locator('[data-tv-cell]').evaluateAll(
       (els) => new Set(els.map((el) => el.getAttribute('data-tv-cell')!.split(':')[0])).size);
-    check(Boolean(barText?.includes('complete')), 'filter tour deep link completes');
+    check(Boolean(popText?.includes('is done')), 'filter tour deep link completes');
     check(rows === 4, `filter tour leaves 4 rows (got ${rows})`);
   } catch (e) {
     check(false, `filter tour deep link (${(e as Error).message.slice(0, 120)})`);

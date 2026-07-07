@@ -699,6 +699,8 @@ export class WebController {
   isTutorialActive(): boolean { return this.stepIndex >= 0 && this.stepIndex < this.tourSteps.length && !this.tourDone; }
   isTutorialDone(): boolean { return this.tourDone; }
   currentTutorialStepNumber(): number | null { return this.isTutorialActive() ? this.stepIndex + 1 : null; }
+  /** The highlighted step; null on the terminal stop. */
+  currentTutorialStep(): TourStep | null { return this.isTutorialActive() ? this.tourSteps[this.stepIndex]! : null; }
   tutorialStepCount(): number { return this.tourSteps.length; }
   selectedTourName(): string { return this.selectedTour?.name ?? ''; }
   goldenAvailable(): boolean { return this.goldenText !== null; }
@@ -735,7 +737,13 @@ export class WebController {
   }
 
   prevStep(): void {
-    if (this.stepIndex > 0) this.stepIndex--;
+    // Previous stays live on the terminal stop (behavior.md #TutorialMode).
+    if (this.tourDone) {
+      this.tourDone = false;
+      this.stepIndex = Math.max(0, this.tourSteps.length - 1);
+    } else if (this.stepIndex > 0) {
+      this.stepIndex--;
+    }
     this.updatePrefill();
   }
 

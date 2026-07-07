@@ -154,3 +154,20 @@
   a key typed after loading a table never reached the wire — every live
   request carried the literal `placeholder` and Google answered 401
   (pinned by web.feature "A key entered after the table is loaded…").
+
+## Session 5 — tour spotlights
+
+- **TourUi is hand-rolled, no driver.js dependency** — same pattern as every
+  other package (plain DOM, no React/Vite/AI-SDK): a fixed overlay of four
+  shade panels + accent ring + popover, `data-tour-*` attributes for tests,
+  keyboard (`→`/Space/Enter next, `←` prev, Esc cancel), and the >55 %-of-
+  viewport spotlight clamp from the package spec.
+- **Prev exists in the app overlay.** spec/behavior.md (#TutorialMode) gives
+  the popover ← Prev / Next → and keeps Previous live on the terminal stop;
+  the gherkin-tour package spec says forward-only. behavior.md outranks, so
+  `TourCursor.prev` is optional — the app supplies it (re-highlight without
+  re-run, `executedThrough` guards), a host that omits it gets the package
+  spec's forward-only popover.
+- **The app's terminal stop** reuses the driver numbering rule (stepCount
+  includes the terminal stop): the shell passes `tutorialStepCount() + 1`,
+  so the Voilà popover reads "N of N" with Next disabled and Finish live.

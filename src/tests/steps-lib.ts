@@ -198,6 +198,22 @@ When('the driver finishes', function (this: TTWorld) {
   (this.scratch.driver as TourDriver).finish();
 });
 
+When('the driver cancels the tour', function (this: TTWorld) {
+  (this.scratch.driver as TourDriver).cancel();
+});
+
+Then('the driver step count is {int}', function (this: TTWorld, n: number) {
+  assert.equal((this.scratch.driver as TourDriver).stepCount(), n);
+});
+
+Then('the driver step number is {int}', function (this: TTWorld, n: number) {
+  assert.equal((this.scratch.driver as TourDriver).currentStepNumber(), n);
+});
+
+Then('the driver step number is null', function (this: TTWorld) {
+  assert.equal((this.scratch.driver as TourDriver).currentStepNumber(), null);
+});
+
 Then('the driver is active', function (this: TTWorld) { assert.ok((this.scratch.driver as TourDriver).active); });
 Then('the driver is not active', function (this: TTWorld) { assert.ok(!(this.scratch.driver as TourDriver).active); });
 Then('the driver is done', function (this: TTWorld) { assert.ok((this.scratch.driver as TourDriver).done); });

@@ -1,1 +1,1 @@
-{ "name": "@tamedtable/gherkin-tour", "version": "0.1.0", "type": "module", "main": "index.ts" }
+{ "name": "@tamedtable/gherkin-tour", "version": "0.1.0", "type": "module", "main": "index.ts", "exports": { ".": "./index.ts", "./ui": "./ui.ts", "./ui.ts": "./ui.ts" } }

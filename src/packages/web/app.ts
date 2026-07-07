@@ -15,6 +15,8 @@ import {
   applyTheme, mountToasts, type Mode, type Toast, type ToastKind,
 } from '@tamedtable/ui-kit/dom.ts';
 import { lightTheme, darkTheme, typography, type Theme } from '@tamedtable/ui-kit';
+import { mountTourUi } from '@tamedtable/gherkin-tour/ui';
+import type { TourStep } from '@tamedtable/gherkin-tour';
 import { matchedReplayFetch } from '@tamedtable/cassette/matcher.ts';
 import type { FetchLike } from '@tamedtable/headless/client.ts';
 import { memRead, writeFileSync as memWrite } from './shims/fs.ts';
@@ -329,26 +331,55 @@ function renderTours(): HTMLElement {
   return wrap;
 }
 
-function renderTourBar(): HTMLElement {
-  const bar = el('div', 'flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:6px 12px;' +
-    'background:var(--uk-accentSoft);border-bottom:1px solid var(--uk-line);font-size:12.5px');
-  bar.setAttribute('data-tour-bar', '');
-  if (controller.isTutorialDone()) {
-    bar.appendChild(el('span', 'font-weight:600', `Tour “${controller.selectedTourName()}” complete 🎉`));
-    bar.appendChild(el('span', 'flex:1'));
-    bar.appendChild(btn('More tours', BTN_CHROME, act(() => { controller.finishTutorial(); toursOpen = true; })));
-    return bar;
+// ---------- tour spotlight overlay (behavior.md #TutorialMode) ----------
+
+const tourHost = el('div');
+
+/** Each step kind's live anchor; null step = the terminal "Voilà" stop. */
+function tourTargetFor(step: TourStep | null): HTMLElement | null {
+  const q = (sel: string) => app.querySelector(sel) as HTMLElement | null;
+  if (!step) return q('[data-tv-scroller]') ?? q('[data-empty-state]');
+  const kind = step.action.kind;
+  if (kind === 'load-file' || kind === 'load-lookup') return q('[data-empty-open]') ?? q('[data-tb-open]');
+  if (kind === 'prefill-chat') return isMobile() ? q('[data-mobile-input]') : q('[data-cp-input]');
+  if (kind === 'play-audio') {
+    return q('[data-testid="mic-button"]') ?? (isMobile() ? q('[data-dock="speak"]') : q('[data-cp-input]'));
   }
-  const step = controller.currentTutorialStepNumber();
-  bar.appendChild(el('span', 'font-weight:600;color:var(--uk-ink)',
-    controller.selectedTourName()));
-  bar.appendChild(el('span', 'color:var(--uk-ink2)', `Step ${step} of ${controller.tutorialStepCount()}`));
-  bar.appendChild(el('span', 'flex:1'));
-  bar.appendChild(btn('← Back', BTN_CHROME, act(() => controller.prevStep()), { 'data-tour-back': '' }));
-  bar.appendChild(btn(busy ? '…' : 'Next →', BTN_PRIMARY, act(() => controller.nextStep()), { 'data-tour-next': '' }));
-  bar.appendChild(btn('Exit tour', BTN + 'background:transparent;color:var(--uk-ink2);border:1px solid transparent',
-    act(() => controller.cancelTutorial())));
-  return bar;
+  return q('[data-tv-scroller]') ?? q('[data-empty-state]');
+}
+
+function renderTourOverlay(): void {
+  app.appendChild(tourHost);
+  if (!controller.isTutorialActive() && !controller.isTutorialDone()) {
+    mountTourUi(tourHost, {
+      cursor: {
+        isActive: () => false, isDone: () => false, currentStep: () => null,
+        currentStepNumber: () => null, stepCount: () => 0,
+        next: () => { /* idle */ }, cancel: () => { /* idle */ }, finish: () => { /* idle */ },
+      },
+      targetFor: () => null,
+      doneDescription: '',
+    });
+    return;
+  }
+  const t = theme();
+  mountTourUi(tourHost, {
+    cursor: {
+      isActive: () => controller.isTutorialActive(),
+      isDone: () => controller.isTutorialDone(),
+      currentStep: () => controller.currentTutorialStep(),
+      currentStepNumber: () => controller.currentTutorialStepNumber(),
+      stepCount: () => controller.tutorialStepCount() + 1,
+      next: () => void act(() => controller.nextStep())(),
+      prev: () => { controller.prevStep(); render(); },
+      cancel: () => { controller.cancelTutorial(); render(); },
+      finish: () => { controller.finishTutorial(); toursOpen = true; render(); },
+    },
+    targetFor: tourTargetFor,
+    doneDescription: `Voilà, "${controller.selectedTourName()}" is done.`,
+    busy,
+    theme: { background: t.surface!, text: t.ink!, border: t.line2!, accent: t.accent! },
+  });
 }
 
 // ---------- main regions ----------
@@ -682,8 +713,6 @@ function renderMobile(): void {
   }
   app.appendChild(bar);
 
-  if (controller.isTutorialActive() || controller.isTutorialDone()) app.appendChild(renderTourBar());
-
   // Table (or the empty pane) fills the middle.
   const main = el('div', 'flex:1;display:flex;flex-direction:column;min-height:0');
   renderTable(main);
@@ -720,9 +749,18 @@ function render(): void {
   app.style.cssText = 'height:100vh;display:flex;flex-direction:column;' +
     'overflow:hidden;background:var(--uk-bg);color:var(--uk-ink)';
 
+  // A phone tour's query step raises the Type sheet so the spotlight lands
+  // on the visible composer (behavior.md #TutorialMode).
+  const tourStepKind = controller.currentTutorialStep()?.action.kind;
+  if (isMobile() && controller.isTutorialActive()) {
+    if (tourStepKind === 'prefill-chat' && mobileSheet === 'none') mobileSheet = 'type';
+    if (tourStepKind !== 'prefill-chat' && mobileSheet === 'type') mobileSheet = 'none';
+  }
+
   if (isMobile()) {
     renderMobile();
     renderDialogLayer();
+    renderTourOverlay();
     app.appendChild(toastHost);
     renderToasts();
     return;
@@ -760,14 +798,13 @@ function render(): void {
     ],
   });
 
-  if (controller.isTutorialActive() || controller.isTutorialDone()) app.appendChild(renderTourBar());
-
   const main = el('div', 'flex:1;display:flex;min-height:0');
   renderChat(main);
   renderTable(main);
   app.appendChild(main);
 
   renderDialogLayer();
+  renderTourOverlay();
 
   app.appendChild(toastHost);
   renderToasts();
