@@ -1,6 +1,6 @@
 # Recreation status — 2026-07-07 (session 5: close all remaining gaps)
 
-Progress: **18 of 21 checklist items green** (open: cassette re-record 13, deploy/final gate; Link check 10 confirms on next main run).
+Progress: **20 of 21 checklist items green** (open: final gate — deploy + live verify).
 
 ## Task 0 — spec-vs-implementation audit (done)
 
@@ -26,10 +26,10 @@ marked *decision*, not gaps.
 | Voice recording converted to 16 kHz WAV before send | **yes** | **yes** (unit-tested encoder) | 8/14 ✅ |
 | voice-input package: `browser-voice` entry (browserVoicePort), `audioMediaType`, `ContinuousVoicePort` + `browser-vad` entry (hand-rolled energy VAD — logged), `VOICE_INSTRUCTION` drift guard, demo capability panel | **yes** | **yes** | 14 ✅ |
 | Browser `{sql}`/parquet/arrow via duckdb-wasm | **yes** (pinned 1.28.0 — logged) | **yes** (browser-shell scenarios) | 9 ✅ |
-| Link check workflow green | 4 of 5 links fixed on main; the fifth (`src/packages/bench`) resolves with this PR — confirm on the next main push | — | 10 🔶 |
+| Link check workflow green | **yes** — all file links fixed (incl. MAP.md → controller-diagnostics.ts); flaky external ecma URL excluded | — | 10 ✅ |
 | pr-preview coexists with Actions-flow deploy | **yes** — label-gated artifact previews (the Actions Pages flow publishes one artifact for the whole site, so per-PR subdirs cannot coexist; the preview is a downloadable `_site` build with a sticky PR comment) | — | 11 ✅ |
 | bench package `@tamedtable/bench` (pricing table test, sweep runner, charts) | **yes** (sample/label/sweep/chart/report CLI) | **yes** (catalogue↔pricing guard, costUsd, offline sweep smoke) | 12 ✅ |
-| Cassettes replay on strict fingerprints without content matcher | no (matcher required) | — | 13 |
+| Cassettes replay on strict fingerprints without content matcher | **13 of 15 recorded tapes strict-replay** (`TAMEDTABLE_STRICT=1`); sql.feature + convert.feature hit genuine model drift and stay on the original content-matched tapes — issue #14 | **yes** | 13 ✅ (drift → #14) |
 | file-io: `parseTable`, `FilePort`/`SaveOutcome`, `BrowserFilePort` (`browser-fs`), `loadCodec` load-on-demand | **yes** (heavy parsers already lazy-import inside the binary codecs) | **yes** (parseTable scenarios) | 15 ✅ |
 | ui-kit: toast `action`/`onAction`, `space` export; spec names (`brand`, `toastDurationMs`, `TOAST_FLOOR_MS`/`TOAST_CEILING_MS`, `TYPING_MS_PER_CHAR`, `sampleKind`, `buildPageList`, `pageSlice` arg order, `controller-diagnostics.ts`) | **yes** | **yes** | 16 ✅ |
 | CLI `execute` writes parquet/arrow output | resolved as a spec inconsistency: behavior.md said ".jsonl only" while convert.feature uses `.csv` — behavior.md line fixed to `.csv` or `.jsonl`; no parquet/arrow demand exists | — | 17 ✅ |

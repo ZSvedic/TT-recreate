@@ -9,6 +9,7 @@ import { WebController, type TutorialManifestEntry } from '@tamedtable/web';
 import type { StoragePort } from '@tamedtable/model-config';
 import { parseTours } from '@tamedtable/gherkin-tour';
 import { makeRecorder } from './cassette.ts';
+import { curlFetch } from './curl-fetch.ts';
 import { readdirSync, writeFileSync } from 'node:fs';
 
 setDefaultTimeout(60_000);
@@ -84,8 +85,11 @@ export class TTWorld extends CucumberWorld {
   scratch: Record<string, unknown> = {};
 
   runnerOpts(): HeadlessRunnerOptions {
+    // Record mode hits the live API and needs the real provider key
+    // (spec/code-contract.md #Cassettes); replay never uses it.
+    const recording = process.env.TAMEDTABLE_CASSETTE === 'record';
     const opts: HeadlessRunnerOptions = {
-      apiKey: 'placeholder',
+      apiKey: recording ? process.env.GEMINI_API_KEY ?? 'placeholder' : 'placeholder',
       fetch: this.recorder ? this.routedFetch() : undefined,
       cwd: SRC_DIR,
       ...this.extraRunnerOpts,
@@ -194,7 +198,13 @@ Before(function (this: TTWorld, { pickle, gherkinDocument }) {
   const cassetteFile = join(CASSETTES, `${this.featureName}.json`);
   const mode = process.env.TAMEDTABLE_CASSETTE === 'record' ? 'record' : 'replay';
   if (process.env.TAMEDTABLE_CASSETTE !== 'off') {
-    this.recorder = makeRecorder(cassetteFile, { mode, contentMatch: mode === 'replay' });
+    this.recorder = makeRecorder(cassetteFile, {
+      mode,
+      // TAMEDTABLE_STRICT=1: fingerprint-only replay (no content matcher).
+      contentMatch: mode === 'replay' && process.env.TAMEDTABLE_STRICT !== '1',
+      // Bun's fetch cannot traverse this environment's proxy — record via curl.
+      ...(mode === 'record' ? { realFetch: curlFetch() } : {}),
+    });
   }
   if (tags.includes('@cancel')) this.extraRunnerOpts.batchSize = 2;
 });

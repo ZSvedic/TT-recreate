@@ -46,7 +46,7 @@ then add a row here.
 |---|---|---|
 | `#WebUI` | `WebController` + the browser shell | [src/packages/web/](src/packages/web/) |
 | `#History` | Undo timeline (cursor journal) | [src/packages/web/controller.ts](src/packages/web/controller.ts) |
-| `#Diagnostics` | Rolling event log, redaction, bug report | [src/packages/web/diagnostics.ts](src/packages/web/diagnostics.ts) |
+| `#Diagnostics` | Rolling event log, redaction, bug report | [src/packages/web/controller-diagnostics.ts](src/packages/web/controller-diagnostics.ts) |
 | `#ChatPanel` | Chat sidebar component | [src/packages/chat-panel/](src/packages/chat-panel/) |
 | `#TableView` | Grid, pagination, status footer | [src/packages/table-view/](src/packages/table-view/) |
 | `#Toolbar` | Top bar, open/save split-buttons, dialogs | [src/packages/toolbar/](src/packages/toolbar/) |

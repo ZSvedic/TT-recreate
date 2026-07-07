@@ -199,3 +199,14 @@
   the x-user-defined charset trick so parquet/arrow samples arrive byte-exact.
 - **Every browser save delivers a download** from the in-memory fs after
   `confirmSave` (one central hook — data, flow, and Python alike).
+
+## Session 5 — cassette re-record
+
+- **Record mode shells out to curl** (`tests/curl-fetch.ts`) — Bun's fetch
+  cannot traverse this environment's proxy; curl honours HTTPS_PROXY and the
+  CA bundle. Replay never touches it.
+- **Record mode uses the real `GEMINI_API_KEY`** from the environment
+  (`world.runnerOpts`); replay keeps the placeholder.
+- **`TAMEDTABLE_STRICT=1`** runs replay fingerprint-only (content matcher
+  off) — the proof the re-recorded tapes carry this implementation's exact
+  request bytes.
