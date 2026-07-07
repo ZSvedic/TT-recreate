@@ -9,7 +9,7 @@ import type { TutorialManifestEntry } from './controller.ts';
 import { ALL_MODELS, type Provider } from '@tamedtable/model-config';
 import { mountTableView, updateSelection } from '@tamedtable/table-view/dom.ts';
 import { mountToolbar, mountUrlDialog, mountSampleDialog } from '@tamedtable/toolbar/dom.ts';
-import { mountChatPanel, mountMicButton } from '@tamedtable/chat-panel/dom.ts';
+import { mountChatPanel, mountMicButton, mountWaveButton } from '@tamedtable/chat-panel/dom.ts';
 import { mountModelChooser } from '@tamedtable/model-config/dom.ts';
 import {
   applyTheme, mountToasts, type Mode, type Toast, type ToastKind,
@@ -20,7 +20,8 @@ import type { TourStep } from '@tamedtable/gherkin-tour';
 import { matchedReplayFetch } from '@tamedtable/cassette/matcher.ts';
 import type { FetchLike } from '@tamedtable/headless/client.ts';
 import { memRead, writeFileSync as memWrite } from './shims/fs.ts';
-import { browserVoicePort } from './voice-port.ts';
+import { browserVoicePort } from '@tamedtable/voice-input/browser-voice';
+import { browserContinuousPort } from '@tamedtable/voice-input/browser-vad';
 
 declare const __TT_BASE__: string;
 declare const __TT_MANIFEST__: TutorialManifestEntry[];
@@ -76,6 +77,7 @@ const controller = new WebController({
   },
   resolveFixturePath: (n) => `/samples/${basename(n)}`,
   voice: browserVoicePort() ?? undefined,
+  continuousVoice: browserContinuousPort({ redemptionMs: 700, minSpeechMs: 300 }) ?? undefined,
   tutorialSources: {
     manifest: __TT_MANIFEST__,
     loadFeature: (n) => fetchText(`${BASE}tutorials/${basename(n)}`),
@@ -552,6 +554,14 @@ function renderChat(target: HTMLElement): void {
         onStop: () => void act(() => controller.stopVoice())(),
         onCancel: () => { controller.cancelVoice(); render(); },
       });
+      if (controller.continuousAvailable()) {
+        const wave = el('span', 'margin-left:6px;display:inline-flex');
+        mountWaveButton(wave, {
+          status: controller.continuousStatus,
+          onToggle: () => void act(() => controller.toggleContinuous())(),
+        });
+        slot.appendChild(wave);
+      }
     } : undefined,
   });
 }
@@ -703,6 +713,14 @@ function renderSpeakSheet(): HTMLElement {
     onCancel: () => { controller.cancelVoice(); render(); },
   });
   body.appendChild(slot);
+  if (controller.continuousAvailable()) {
+    const wave = el('span', 'display:inline-flex');
+    mountWaveButton(wave, {
+      status: controller.continuousStatus,
+      onToggle: () => void act(() => controller.toggleContinuous())(),
+    });
+    body.appendChild(wave);
+  }
   body.appendChild(el('span', 'font-size:11.5px;color:var(--uk-ink4)',
     'Hold to record · release to send · tap to latch'));
   return frame;

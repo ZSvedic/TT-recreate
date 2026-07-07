@@ -35,6 +35,19 @@ function stubVoicePort(): VoicePort {
   };
 }
 
+// Capability panel: what the real browser ports would find here.
+{
+  const caps = document.createElement('pre');
+  caps.id = 'caps';
+  const yes = (ok: boolean) => (ok ? 'yes' : 'no');
+  caps.textContent = [
+    `getUserMedia: ${yes(typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia))}`,
+    `MediaRecorder: ${yes(typeof MediaRecorder !== 'undefined')}`,
+    `AudioContext: ${yes(typeof AudioContext !== 'undefined')}`,
+  ].join('\n');
+  document.body.insertBefore(caps, out);
+}
+
 const voice = stubVoicePort();
 const stateEl = document.getElementById('vi-state')!;
 const resultEl = document.getElementById('vi-result')!;

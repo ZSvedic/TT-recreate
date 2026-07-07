@@ -171,3 +171,16 @@
 - **The app's terminal stop** reuses the driver numbering rule (stepCount
   includes the terminal stop): the shell passes `tutorialStepCount() + 1`,
   so the Voilà popover reads "N of N" with Next disabled and Finish live.
+
+## Session 5 — voice
+
+- **Hands-free VAD is a hand-rolled energy detector** (`browser-vad.ts`:
+  AnalyserNode RMS with open/keep hysteresis, redemption window, min-speech
+  floor, 16 kHz WAV segments) instead of the contract's @ricky0123/vad-web —
+  no WASM/CDN dependency, same `ContinuousVoicePort` surface and tuning
+  knobs; tests inject stub ports either way.
+- **browserVoicePort moved into `@tamedtable/voice-input/browser-voice`**
+  and now re-encodes MediaRecorder output to 16 kHz mono PCM16 WAV
+  (`encodeWavPcm16`, unit-tested) with a raw-blob fallback when decode fails.
+- **The 30 s auto-send cap is injectable** (`voiceSchedule` option) so the
+  Gherkin scenario fires the timer on a fake clock.

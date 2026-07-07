@@ -47,3 +47,9 @@ Feature: Voice input package
       When the user starts recording
       And the user cancels recording
       Then the voice state is "idle"
+
+    @web
+    Scenario: The demo reports the browser's capture capabilities
+      Given the voice-input demo page
+      Then the demo capability panel reports "MediaRecorder"
+      And the demo capability panel reports "getUserMedia"

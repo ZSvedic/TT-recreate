@@ -31,3 +31,36 @@ export interface VoicePort {
   stopRecording(): Promise<Blob>;
   cancelRecording(): void;
 }
+
+/** Clip extension → MIME type; the pair is fingerprint-load-bearing on a
+ *  voice patch turn, so unknowns fall back to audio/mp4 (the tour clips). */
+export function audioMediaType(filename: string): string {
+  const ext = filename.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? '';
+  const map: Record<string, string> = {
+    m4a: 'audio/mp4', mp4: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav',
+    webm: 'audio/webm', ogg: 'audio/ogg', flac: 'audio/flac', aac: 'audio/aac',
+  };
+  return map[ext] ?? 'audio/mp4';
+}
+
+// ---------- hands-free continuous voice ----------
+
+export interface ContinuousVoiceHandlers {
+  /** One finished spoken turn, encoded as WAV. */
+  onSegment: (clip: Blob) => void | Promise<void>;
+  onSpeechStart?: () => void;
+  onError?: (err: Error) => void;
+}
+
+/** Turn-detection knobs, in milliseconds. `redemptionMs` is the silence
+ *  before a turn closes — the felt delay. */
+export interface VadTuning {
+  redemptionMs: number;
+  minSpeechMs: number;
+}
+
+export interface ContinuousVoicePort {
+  start(handlers: ContinuousVoiceHandlers): Promise<void>;
+  stop(): void;
+  setTuning?(tuning: Partial<VadTuning>): void;
+}

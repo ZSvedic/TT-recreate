@@ -57,6 +57,8 @@ export class TTWorld extends CucumberWorld {
   /** Injected StoragePort + env override for the key-persistence scenarios. */
   storagePort: StoragePort | null = null;
   controllerEnv: Record<string, string | undefined> | null = null;
+  /** Timers the controller armed through the injected voice scheduler. */
+  voiceTimers: Array<{ fn: () => void | Promise<void>; ms: number }> = [];
   urlRoutes = new Map<string, string>();
   replayRecorders: Array<ReturnType<typeof makeRecorder>> = [];
   runner: (Runner & { exportPython(): Promise<string> }) | null = null;
@@ -130,6 +132,12 @@ export class TTWorld extends CucumberWorld {
           return r;
         },
         onAudioClip: (name) => this.setVoiceHint(name),
+        // Fake clock for the 30-second auto-send cap: steps fire timers by hand.
+        voiceSchedule: (fn, ms) => {
+          const entry = { fn, ms };
+          this.voiceTimers.push(entry);
+          return () => { this.voiceTimers = this.voiceTimers.filter((t) => t !== entry); };
+        },
       });
     }
     return this.controller;

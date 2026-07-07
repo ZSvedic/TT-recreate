@@ -11,7 +11,10 @@ import {
   type Provider, type StoragePort,
 } from '@tamedtable/model-config';
 import { readStoredConfig, writeStoredConfig, clearStoredConfig } from '@tamedtable/model-config/storage';
-import { buildVoicePrompt, type VoicePort, type VoiceContext } from '@tamedtable/voice-input';
+import {
+  buildVoicePrompt, type VoicePort, type VoiceContext,
+  type ContinuousVoiceHandlers, type ContinuousVoicePort,
+} from '@tamedtable/voice-input';
 import { fetchTable, serializeFlow, type FormatId } from '@tamedtable/file-io';
 import { pageCountFor, clampPage, pageSlice } from '@tamedtable/table-view';
 import { parseTours, type TourScenario, type TourStep } from '@tamedtable/gherkin-tour';
@@ -22,15 +25,8 @@ export type Engine = ReturnType<typeof createHeadlessRunner>;
 
 export interface ChatMessage { role: 'user' | 'assistant'; text: string; error?: boolean; debug?: RequestDebugInfo }
 
-export interface ContinuousVoiceHandlers {
-  onSegment: (clip: Blob) => void | Promise<void>;
-  onSpeechStart?: () => void;
-  onError?: (err: Error) => void;
-}
-export interface ContinuousVoicePort {
-  start(handlers: ContinuousVoiceHandlers): Promise<void>;
-  stop(): void;
-}
+// The hands-free port types live in @tamedtable/voice-input; re-exported for hosts.
+export type { ContinuousVoiceHandlers, ContinuousVoicePort };
 
 export interface TutorialManifestEntry { name: string; feature: string; tags: string[] }
 
@@ -61,6 +57,8 @@ export interface WebControllerOptions {
   replayFetchFor?: (featureBase: string) => FetchLike;
   /** Hook fired before a play-audio / stubbed-mic clip is sent (test matcher hint). */
   onAudioClip?: (name: string) => void;
+  /** Timer injection for the 30 s voice auto-send cap (tests use a fake clock). */
+  voiceSchedule?: (fn: () => void | Promise<void>, ms: number) => () => void;
   version?: string;
 }
 
@@ -564,16 +562,30 @@ export class WebController {
   }
   continuousAvailable(): boolean { return this.micVisible() && this.continuousPort !== null; }
 
+  private static readonly VOICE_CAP_MS = 30_000;
+  private voiceCapCancel: (() => void) | null = null;
+
   async startVoice(): Promise<void> {
     if (this.voiceStatus !== 'idle') return;
     await this.voicePort!.startRecording();
     this.voiceStatus = 'recording';
+    // A recording that reaches thirty seconds stops and sends on its own.
+    const schedule = this.opts.voiceSchedule
+      ?? ((fn: () => void | Promise<void>, ms: number) => {
+        const t = setTimeout(() => void fn(), ms);
+        return () => clearTimeout(t);
+      });
+    this.voiceCapCancel = schedule(async () => {
+      if (this.voiceStatus === 'recording' || this.voiceStatus === 'latched') await this.stopVoice();
+    }, WebController.VOICE_CAP_MS);
   }
 
   latchVoice(): void { if (this.voiceStatus === 'recording') this.voiceStatus = 'latched'; }
 
   async stopVoice(): Promise<void> {
     if (this.voiceStatus !== 'recording' && this.voiceStatus !== 'latched') return;
+    this.voiceCapCancel?.();
+    this.voiceCapCancel = null;
     const blob = await this.voicePort!.stopRecording();
     this.voiceStatus = 'sending';
     try {
@@ -585,6 +597,8 @@ export class WebController {
   }
 
   cancelVoice(): void {
+    this.voiceCapCancel?.();
+    this.voiceCapCancel = null;
     if (this.voiceStatus === 'recording' || this.voiceStatus === 'latched') this.voicePort?.cancelRecording();
     this.voiceStatus = 'idle';
   }
